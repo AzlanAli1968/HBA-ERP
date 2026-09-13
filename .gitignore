@@ -30,3 +30,6 @@ storage/app/*
 .idea/
 .DS_Store
 Thumbs.db
+
+/whatsapp-bot/data/bot-token.txt
+/whatsapp-bot/data/recent-messages.json
