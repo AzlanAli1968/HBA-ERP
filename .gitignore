@@ -1,0 +1,126 @@
+.env
+.env.*
+!.env.example
+
+/vendor/
+/node_modules/
+/public/build/
+/public/hot/
+
+storage/logs/*
+storage/framework/*
+storage/app/*
+!storage/app/.gitignore
+!storage/framework/.gitignore
+!storage/logs/.gitignore
+
+/whatsapp-bot/node_modules/
+/whatsapp-bot/data/downloads/
+/whatsapp-bot/.env
+/whatsapp-bot/.env.*
+
+*.log
+*.bak
+*.backup
+*.dump
+*.sql
+*.sql.gz
+
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+/whatsapp-bot/data/bot-token.txt
+/whatsapp-bot/data/recent-messages.json
+
+# Production/server-only files
+/.cursor/
+/public_html
+/public_html_backup/
+/public/build_before_whatsapp_fix/
+/__pycache__/
+/whatsapp-bot/tmp/
+/storage/*
+
+# Production rollback/temporary source copies
+*.before-*
+
+# Accidental root-level command/snippet artifacts
+/$invoiceNo) {
+/'')
+/0.0,
+/103806,
+/103807,
+/103808,
+/1100002,
+/1100007,
+/20000.0,
+/4,
+/50000.0,
+/9,
+/9050.0
+/OtherReportsController::class);/
+/actions')/
+/c=" . ($x->mode_description ?? 'NULL')/
+/first())/
+/getDatabaseName())/
+/id
+/journal_entry_id
+/s
+/senger' => $l->passenger,/
+/senger_name',/
+/t();/
+/toArray())/
+/value('email'))/
+
+# Additional production rollback / temporary files
+*.bak*
+/patch_*.py
+/__pycache__/
+/public_html
+/public_html_backup/
+/public/build_before_whatsapp_fix/
+/whatsapp-bot/node_modules
+/whatsapp-bot/tmp/
+
+# Accidental root-level command/snippet artifacts
+/')
+/9050.0,
+/OtherReportsController::class);/
+/actions')
+/c=" . ($x->mode_description ?? 'NULL')/
+/first())
+/getDatabaseName())
+/senger' => $l->passenger,/
+/senger_name',/
+/t();/
+/toArray())
+/value('email'))/
+
+# Production-only patch scripts / migration utilities
+/patch_*.py
+
+# Accidental root-level shell/PHP snippet artifacts
+/OtherReportsController::class);
+/c=" . ($x->mode_description ?? 'NULL')
+/senger' => $l->passenger,
+/senger_name',
+/t();
+//toArray())
+/value('email'))
+/first())
+/getDatabaseName())
+/actions')
+/')
+/0.0,
+/103806,
+/103807,
+/103808,
+/1100002,
+/1100007,
+/20000.0,
+/4,
+/50000.0,
+/9,
+/9050.0

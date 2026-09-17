@@ -1,0 +1,21 @@
+{
+  "name": "hba-erp-whatsapp-bot",
+  "version": "2.0.0",
+  "private": true,
+  "description": "HBA ERP WhatsApp integration service",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "whatsapp": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@cacheable/node-cache": "^1.4.0",
+    "@whiskeysockets/baileys": "7.0.0-rc13",
+    "express": "^4.21.2",
+    "pino": "^9.6.0",
+    "qrcode": "^1.5.4"
+  }
+}
