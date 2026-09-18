@@ -313,8 +313,13 @@ function lineProfit(line: Partial<Line>): number {
     }
     if (line.mode === 'Ticket') {
         // Ticket agent amount is an extra customer-side charge and a
-        // separate commission posting, so it is excluded from service profit.
-        return ticketBaseSale(line) - linePayable(line);
+        // separate commission posting, so it must not reduce ticket profit.
+        const ticketCost =
+            numberValue(line.vendor_amount) +
+            numberValue(line.vendor_amount_2) +
+            numberValue(line.vendor_amount_3);
+
+        return ticketBaseSale(line) - ticketCost;
     }
     if (line.mode === 'Other') {
         // Other services use the same optional customer-side agent commission
