@@ -32,6 +32,21 @@ const path =
     require('path');
 
 
+const {
+    processHotelInvoiceMessage,
+} = require('./hotel-invoice-flow');
+
+const {
+    processHotelInvoiceAddMessage,
+} = require('./hotel-invoice-add-flow');
+
+
+const {
+    getOrCreateConversation,
+    saveConversation,
+    clearConversation,
+} = require('./conversation-store');
+
 /*
 |--------------------------------------------------------------------------
 | BASIC CONFIGURATION
@@ -355,6 +370,15 @@ const groupMetadataCache =
 
 const GROUP_METADATA_TTL =
     5 * 60 * 1000;
+
+const GROUP_METADATA_REFRESH_TIMEOUT_MS =
+    Number(
+        process.env.WHATSAPP_GROUP_METADATA_TIMEOUT_MS ||
+            5000,
+    );
+
+const groupMetadataRefreshPromises =
+    new Map();
 
 
 /*
@@ -1075,33 +1099,108 @@ async function ensureSelectedGroupMetadata(
         return cached;
     }
 
-    try {
-        console.log(
-            `[WhatsApp] Refreshing metadata for selected group only: ${jid}`,
-        );
-
-        const metadata =
-            await sock.groupMetadata(
-                jid,
-            );
-
-        storeGroupMetadata(
+    const existing =
+        groupMetadataRefreshPromises.get(
             jid,
-            metadata,
         );
 
-        return metadata;
-    } catch (
-        error
+    if (
+        existing
     ) {
-        console.warn(
-            `[WhatsApp] Selected group metadata refresh failed: ${error.message}`,
-        );
+        if (
+            cached
+        ) {
+            return cached;
+        }
+
+        return Promise.race([
+            existing,
+            new Promise((resolve) =>
+                setTimeout(
+                    () => resolve(undefined),
+                    GROUP_METADATA_REFRESH_TIMEOUT_MS,
+                )
+            ),
+        ]);
+    }
+
+    console.log(
+        `[WhatsApp] Refreshing metadata for selected group only: ${jid}`,
+    );
+
+    const refresh =
+        (async () => {
+            try {
+                const metadata =
+                    await sock.groupMetadata(
+                        jid,
+                    );
+
+                storeGroupMetadata(
+                    jid,
+                    metadata,
+                );
+
+                return metadata;
+            } catch (
+                error
+            ) {
+                console.warn(
+                    `[WhatsApp] Selected group metadata refresh failed: ${error.message}`,
+                );
+
+                return cached;
+            }
+        })();
+
+    groupMetadataRefreshPromises.set(
+        jid,
+        refresh,
+    );
+
+    // Normal callers never wait on a live WhatsApp metadata request.
+    if (
+        !force
+    ) {
+        refresh
+            .catch(() => undefined)
+            .finally(() => {
+                if (
+                    groupMetadataRefreshPromises.get(
+                        jid,
+                    ) === refresh
+                ) {
+                    groupMetadataRefreshPromises.delete(
+                        jid,
+                    );
+                }
+            });
 
         return cached;
     }
-}
 
+    try {
+        return await Promise.race([
+            refresh,
+            new Promise((resolve) =>
+                setTimeout(
+                    () => resolve(cached),
+                    GROUP_METADATA_REFRESH_TIMEOUT_MS,
+                )
+            ),
+        ]);
+    } finally {
+        if (
+            groupMetadataRefreshPromises.get(
+                jid,
+            ) === refresh
+        ) {
+            groupMetadataRefreshPromises.delete(
+                jid,
+            );
+        }
+    }
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -1535,7 +1634,161 @@ function extractMessageText(
     ).trim();
 }
 
+function extractVoiceAudioMessage(
+    message,
+) {
+    let content =
+        message?.message || null;
 
+    for (
+        let depth = 0;
+        depth < 6 && content;
+        depth += 1
+    ) {
+        if (
+            content?.audioMessage
+        ) {
+            return content.audioMessage;
+        }
+
+        if (
+            content?.ephemeralMessage?.message
+        ) {
+            content =
+                content
+                    .ephemeralMessage
+                    .message;
+
+            continue;
+        }
+
+        if (
+            content?.viewOnceMessage?.message
+        ) {
+            content =
+                content
+                    .viewOnceMessage
+                    .message;
+
+            continue;
+        }
+
+        if (
+            content?.viewOnceMessageV2?.message
+        ) {
+            content =
+                content
+                    .viewOnceMessageV2
+                    .message;
+
+            continue;
+        }
+
+        if (
+            content?.viewOnceMessageV2Extension?.message
+        ) {
+            content =
+                content
+                    .viewOnceMessageV2Extension
+                    .message;
+
+            continue;
+        }
+
+        if (
+            content?.documentWithCaptionMessage?.message
+        ) {
+            content =
+                content
+                    .documentWithCaptionMessage
+                    .message;
+
+            continue;
+        }
+
+        break;
+    }
+
+    return null;
+}
+
+function extractVoiceAudioMessage(
+    message,
+) {
+    let content =
+        message?.message || null;
+
+    for (
+        let depth = 0;
+        depth < 6 && content;
+        depth += 1
+    ) {
+        if (
+            content?.audioMessage
+        ) {
+            return content.audioMessage;
+        }
+
+        if (
+            content?.ephemeralMessage?.message
+        ) {
+            content =
+                content
+                    .ephemeralMessage
+                    .message;
+
+            continue;
+        }
+
+        if (
+            content?.viewOnceMessage?.message
+        ) {
+            content =
+                content
+                    .viewOnceMessage
+                    .message;
+
+            continue;
+        }
+
+        if (
+            content?.viewOnceMessageV2?.message
+        ) {
+            content =
+                content
+                    .viewOnceMessageV2
+                    .message;
+
+            continue;
+        }
+
+        if (
+            content?.viewOnceMessageV2Extension?.message
+        ) {
+            content =
+                content
+                    .viewOnceMessageV2Extension
+                    .message;
+
+            continue;
+        }
+
+        if (
+            content?.documentWithCaptionMessage?.message
+        ) {
+            content =
+                content
+                    .documentWithCaptionMessage
+                    .message;
+
+            continue;
+        }
+
+        break;
+    }
+
+    return null;
+}
 /*
 |--------------------------------------------------------------------------
 | ERP PDF
@@ -1741,6 +1994,11 @@ async function fetchLedgerPdf(command) {
             ERP_REQUEST_TIMEOUT_MS,
         );
 
+    const pdfStartedAt = Date.now();
+
+    console.log(
+        `[WHATSAPP] ERP ledger PDF request started: ${endpoint}`,
+    );
     try {
         const response =
             await fetch(
@@ -1772,6 +2030,9 @@ async function fetchLedgerPdf(command) {
             Buffer.from(
                 await response.arrayBuffer(),
             );
+        console.log(
+            `[WHATSAPP] ERP ledger PDF response: HTTP ${response.status}, ${buffer.length} bytes, ${Date.now() - pdfStartedAt}ms`,
+        );
 
         if (!response.ok) {
             let detail =
@@ -1882,6 +2143,11 @@ async function fetchOtherReportPdf(
             ERP_REQUEST_TIMEOUT_MS,
         );
 
+    const pdfStartedAt = Date.now();
+
+    console.log(
+        `[WHATSAPP] ERP other-report PDF request started: ${endpoint}`,
+    );
     try {
         const response =
             await fetch(
@@ -1914,6 +2180,9 @@ async function fetchOtherReportPdf(
             Buffer.from(
                 await response.arrayBuffer(),
             );
+        console.log(
+            `[WHATSAPP] ERP other-report PDF response: HTTP ${response.status}, ${buffer.length} bytes, ${Date.now() - pdfStartedAt}ms`,
+        );
 
         if (
             !response.ok
@@ -2144,11 +2413,11 @@ async function createHotelInvoiceFromWhatsApp(
         }
 
         const result =
-            JSON.parse(
-                body.toString(
-                    'utf8'
-                )
-            );
+    JSON.parse(
+        body
+            .toString('utf8')
+            .replace(/^\uFEFF/, '')
+    );
 
         if (
             !result?.ok ||
@@ -2285,11 +2554,11 @@ async function createVisaInvoiceFromWhatsApp(
         }
 
         const result =
-            JSON.parse(
-                body.toString(
-                    'utf8'
-                )
-            );
+    JSON.parse(
+        body
+            .toString('utf8')
+            .replace(/^\uFEFF/, '')
+    );
 
         if (
             !result?.ok ||
@@ -2896,11 +3165,14 @@ async function addHotelInvoiceLineFromWhatsApp(
         }
 
         const result =
-            JSON.parse(
-                body.toString(
-                    'utf8'
-                )
-            );
+    JSON.parse(
+        body
+            .toString('utf8')
+            .replace(
+                /^\uFEFF/,
+                '',
+            )
+    );
 
         if (
             !result?.ok ||
@@ -4442,9 +4714,6 @@ async function sendLedgerPdf({
          * Keep the same WhatsApp metadata/sender-key handling
          * already used by invoice/voucher PDFs.
          */
-        await ensureSelectedGroupMetadata(
-            false,
-        );
 
         const pdfBuffer =
             await fetchLedgerPdf(
@@ -4635,9 +4904,6 @@ async function sendOtherReportPdf({
             `[WHATSAPP] Preparing ${reportLabel} ${command.dateFrom} -> ${command.dateTo}`,
         );
 
-        await ensureSelectedGroupMetadata(
-            false,
-        );
 
         const pdfBuffer =
             await fetchOtherReportPdf(
@@ -5541,12 +5807,83 @@ async function handleSelectedGroupMessage(
     message,
     remoteJid,
 ) {
-    const text =
+    let text =
         extractMessageText(
             message,
         );
 
-    if (!text) {
+    let isVoiceMessage =
+        false;
+
+    if (
+        !text
+    ) {
+        const voiceAudioMessage =
+            extractVoiceAudioMessage(
+                message,
+            );
+
+        if (
+            voiceAudioMessage
+        ) {
+            isVoiceMessage =
+                true;
+
+            try {
+                console.log(
+                    `[WHATSAPP VOICE] Transcribing voice message for ${remoteJid}...`,
+                );
+
+                text =
+                    await transcribeWhatsAppVoiceMessage(
+                        voiceAudioMessage,
+                    );
+
+                console.log(
+                    `[WHATSAPP VOICE] Transcript for ${remoteJid}: ${text.slice(
+                        0,
+                        1000,
+                    )}`,
+                );
+            } catch (
+                error
+            ) {
+                console.error(
+                    `[WHATSAPP VOICE] Transcription failed for ${remoteJid}:`,
+                    error.message,
+                );
+
+                if (
+                    sock &&
+                    connectionState ===
+                        'connected'
+                ) {
+                    try {
+                        await sock.sendMessage(
+                            remoteJid,
+                            {
+                                text:
+                                    `Unable to understand the voice message. ${error.message}`,
+                            },
+                        );
+                    } catch (
+                        sendError
+                    ) {
+                        console.error(
+                            '[WHATSAPP VOICE] Failed to send transcription error:',
+                            sendError.message,
+                        );
+                    }
+                }
+
+                return;
+            }
+        }
+    }
+
+    if (
+        !text
+    ) {
         return;
     }
 
@@ -7844,12 +8181,15 @@ async function handleSelectedGroupMessage(
     message,
     remoteJid,
 ) {
-    const text =
+    let text =
         extractMessageText(
             message,
         );
 
-    if (!text) {
+    
+    if (
+        !text
+    ) {
         return;
     }
 
@@ -8486,6 +8826,1129 @@ if (
 
         return;
     }
+        /*
+     * ------------------------------------------------------
+     * EARLY STATEMENT / LEDGER PDF
+     * ------------------------------------------------------
+     *
+     * Statement PDF must be handled before AI.
+     *
+     * Existing supported command:
+     *
+     * PDF
+     * STA
+     * 052
+     * 01JUN26
+     * 30JUN26
+     *
+     * Optional:
+     * SAR
+     * COM
+     */
+
+    const earlyLedgerCommand =
+        parseLedgerPdfCommand(
+            text,
+        );
+
+    if (
+        earlyLedgerCommand
+    ) {
+        try {
+            await sendLedgerPdf({
+                remoteJid,
+
+                command:
+                    earlyLedgerCommand,
+            });
+        } catch (
+            error
+        ) {
+            console.error(
+                `[WHATSAPP] Statement/Ledger PDF command failed for account ${earlyLedgerCommand.accountSuffix}:`,
+                error.message,
+            );
+
+            if (
+                sock &&
+                connectionState ===
+                    'connected'
+            ) {
+                try {
+                    await sock.sendMessage(
+                        remoteJid,
+                        {
+                            text:
+                                `Unable to generate ledger for account ${earlyLedgerCommand.accountSuffix} from ${earlyLedgerCommand.dateFrom} to ${earlyLedgerCommand.dateTo}. ${error.message}`,
+                        },
+                    );
+                } catch (
+                    sendError
+                ) {
+                    console.error(
+                        '[WHATSAPP] Failed to send Statement/Ledger PDF error:',
+                        sendError.message,
+                    );
+                }
+            }
+        }
+
+        return;
+    }
+
+    /*
+     * ------------------------------------------------------
+     * PDF SAFETY FENCE
+     * ------------------------------------------------------
+     *
+     * Any message beginning with PDF must NEVER reach AI.
+     *
+     * Valid PDF commands have already been handled above.
+     * Unsupported/malformed PDF commands stop here safely.
+     */
+
+    if (
+        /^\s*pdf\b/i.test(
+            text,
+        )
+    ) {
+        console.log(
+            `[WHATSAPP] PDF message blocked from AI after command routing: ${remoteJid}`,
+        );
+
+        return;
+    }
+
+
+
+        
+/*
+ * ------------------------------------------------------
+ * GLOBAL AI CONVERSATION RESET
+ * ------------------------------------------------------
+ *
+ * This is checked before any AI processing.
+ *
+ * Supported:
+ * ABORT
+ * RESET
+ * RESTART
+ * CANCEL
+ * CANCEL CONVERSATION
+ * RESET CONVERSATION
+ * RESTART CONVERSATION
+ *
+ * The reset is isolated to:
+ * group + sender
+ */
+
+const resetSenderJid =
+    String(
+        message?.key?.participant ||
+        message?.key?.participantAlt ||
+        '',
+    ).trim();
+
+const resetCommand =
+    /^(?:abort|cancel|reset|restart)(?:\s+(?:conversation|ai))?$/i.test(
+        String(
+            text || '',
+        ).trim(),
+    );
+
+if (
+    resetSenderJid &&
+    resetCommand
+) {
+    clearConversation(
+        remoteJid,
+        resetSenderJid,
+    );
+
+    if (
+        sock &&
+        connectionState ===
+            'connected'
+    ) {
+        await sock.sendMessage(
+            remoteJid,
+            {
+                text:
+                    '✅ Bot conversation reset. You can start again.',
+            },
+        );
+    }
+
+    console.log(
+        `[WHATSAPP AI] Global conversation reset: ${remoteJid} / ${resetSenderJid}`,
+    );
+
+    return;
+}
+
+/*
+ * ------------------------------------------------------
+ * PDF SAFETY GUARD
+ * ------------------------------------------------------
+ *
+ * Every supported PDF command has already been handled
+ * above this point.
+ *
+ * Therefore ANY message beginning with PDF must NEVER
+ * enter the AI handler.
+ *
+ * This protects existing commands even when a malformed
+ * or unsupported PDF command is received.
+ */
+
+if (
+    /^\s*pdf\b/i.test(
+        String(
+            text || '',
+        ),
+    )
+) {
+    console.log(
+        `[WHATSAPP] Ignoring unsupported PDF command before AI for ${remoteJid}`,
+    );
+
+    return;
+}
+/*
+     * ------------------------------------------------------
+     * AI HOTEL INVOICE
+     * ------------------------------------------------------
+     *
+     * Natural-language hotel invoice intake.
+     *
+     * Existing explicit WhatsApp commands above this section
+     * remain unchanged.
+     *
+     * IMPORTANT:
+     * - Conversation is isolated by group + sender.
+     * - Complete draft does NOT create an ERP invoice.
+     * - ERP creation happens ONLY after explicit "OK".
+     * ------------------------------------------------------
+     */
+
+    const senderJid =
+        String(
+            message?.key?.participant ||
+            message?.key?.participantAlt ||
+            '',
+        ).trim();
+
+    if (
+    senderJid
+) {
+    try {
+        const conversation =
+            getOrCreateConversation(
+                remoteJid,
+                senderJid,
+            );
+
+            const normalizedText =
+                String(
+                    text || '',
+                )
+                    .trim()
+                    .toLowerCase();
+
+                        /*
+             * --------------------------------------------------
+             * GLOBAL AI CONVERSATION RESET
+             * --------------------------------------------------
+             *
+             * Works at any stage of the current AI conversation.
+             *
+             * ABORT
+             * RESET
+             * RESTART
+             * CANCEL
+             * ABORT CONVERSATION
+             * RESET CONVERSATION
+             * RESTART CONVERSATION
+             * CANCEL CONVERSATION
+             */
+
+            const resetCommand =
+                /^(?:abort|cancel|reset|restart)(?:\s+(?:conversation|ai))?$/i.test(
+                    text.trim(),
+                );
+
+            if (
+                resetCommand
+            ) {
+                clearConversation(
+                    remoteJid,
+                    senderJid,
+                );
+
+                await sock.sendMessage(
+                    remoteJid,
+                    {
+                        text:
+                            '✅ Bot conversation reset. You can start again.',
+                    },
+                );
+
+                console.log(
+                    `[WHATSAPP AI] Conversation reset by ${remoteJid} / ${senderJid}`,
+                );
+
+                return;
+            }
+
+                        /*
+                    
+             * --------------------------------------------------
+             * AI ADD HOTEL LINE
+             * --------------------------------------------------
+             *
+             * This is separate from NEW HOTEL INVOICE.
+             *
+             * ADD HOTEL LINE:
+             * - uses an existing invoice number
+             * - does NOT ask for a client code
+             * - collects the hotel line one field at a time
+             * - waits for OK / YES before touching ERP
+             *
+             * IMPORTANT:
+             * Keep the existing strict ADD command parser intact.
+             * Only natural-language ADD HOTEL messages come here.
+             */
+
+
+            const strictAddHotelCommand =
+                parseAddHotelInvoiceCommand(
+                    text,
+                );
+
+            const hotelAddStartPattern =
+                /\b(?:add\s+(?:to\s+)?invoice|add\s+(?:a\s+)?hotel(?:\s+line)?|hotel\s+line)\b/i;
+
+            const explicitNonHotelAddPattern =
+                /\b(?:visa|transfer|ticket|voucher)\b/i;
+
+            const hotelAddStart =
+                !strictAddHotelCommand &&
+                hotelAddStartPattern.test(
+                    text,
+                ) &&
+                !explicitNonHotelAddPattern.test(
+                    text,
+                );
+
+            const existingHotelAddConversation =
+                conversation.draft &&
+                conversation.draft.document_type ===
+                    'hotel_invoice_add' &&
+                (
+                    conversation.state ===
+                        'collecting' ||
+                    conversation.awaitingField
+                );
+
+            /*
+             * Explicit "add to invoice ..." always starts/restarts
+             * the ADD HOTEL LINE flow.
+             *
+             * This also overrides an old unfinished NEW HOTEL
+             * conversation that may still exist in the store.
+             */
+            if (
+                hotelAddStart ||
+                (
+                    existingHotelAddConversation &&
+                    !conversation.awaitingConfirmation
+                )
+            ) {
+                const addDraft =
+                    hotelAddStart
+                        ? null
+                        : conversation.draft;
+
+                const addResult =
+                    await processHotelInvoiceAddMessage(
+                        text,
+                        addDraft,
+                        {
+                            currentDate:
+                                new Date(),
+
+                            erpBaseUrl:
+                                ERP_BASE_URL,
+
+                            botToken:
+                                getBotToken(),
+                        },
+                    );
+
+                conversation.lastUserMessage =
+                    text;
+
+                conversation.draft =
+                    addResult.draft ||
+                    addDraft ||
+                    null;
+
+                conversation.awaitingField =
+                    addResult.nextQuestion?.field ||
+                    null;
+
+                conversation.awaitingConfirmation =
+                    Boolean(
+                        addResult.ok &&
+                        addResult.draft,
+                    );
+
+                conversation.state =
+                    conversation.awaitingConfirmation
+                        ? 'awaiting_confirmation'
+                        : 'collecting';
+
+                saveConversation(
+                    conversation,
+                );
+
+                /*
+                 * Still collecting.
+                 */
+                if (
+                    !addResult.ok
+                ) {
+                    await sock.sendMessage(
+                        remoteJid,
+                        {
+                            text:
+                                addResult.message ||
+                                'Please provide the hotel line information.',
+                        },
+                    );
+
+                    console.log(
+                        `[WHATSAPP AI] Hotel add-line intake reply to ${remoteJid} / ${senderJid}: ${addResult.message || 'No message'}`,
+                    );
+
+                    return;
+                }
+
+                /*
+                 * Complete -> show summary -> wait for OK / YES.
+                 */
+                const addDraftComplete =
+                    addResult.draft;
+
+                const addVendorDisplay =
+                    addDraftComplete.vendor_name ||
+                    addDraftComplete.vendor_suffix;
+
+                const addCurrencyDisplay =
+                    addDraftComplete.currency_code ||
+                    'PKR';
+
+                const addRoeDisplay =
+                    addDraftComplete.currency_rate ??
+                    '—';
+
+                const addSummary = [
+                    '🏨 ADD HOTEL LINE',
+                    '',
+                    `Invoice: #${addDraftComplete.invoice_reference}`,
+                    `Passenger: ${addDraftComplete.passenger_name}`,
+                    `Hotel: ${addDraftComplete.hotel_name}`,
+                    `Room: ${addDraftComplete.room_type}`,
+                    `Meal: ${addDraftComplete.meal}`,
+                    `Check-in: ${addDraftComplete.check_in}`,
+                    `Check-out: ${addDraftComplete.check_out}`,
+                    `Nights: ${addDraftComplete.nights}`,
+                    `Rooms: ${addDraftComplete.room_quantity}`,
+                    `Sell Rate/Night: ${addDraftComplete.rate}`,
+                    `Vendor: ${addVendorDisplay}`,
+                    `Buy Rate/Night: ${addDraftComplete.vendor_rate}`,
+                    `Currency: ${addCurrencyDisplay}`,
+                    `ROE: ${addRoeDisplay}`,
+                    '',
+                    'Reply OK or YES to add this hotel line.',
+                    'Reply CANCEL to discard it.',
+                ].join(
+                    '\n',
+                );
+
+                await sock.sendMessage(
+                    remoteJid,
+                    {
+                        text:
+                            addSummary,
+                    },
+                );
+
+                console.log(
+                    `[WHATSAPP AI] Hotel add-line draft ready for ${remoteJid} / ${senderJid}: ${JSON.stringify(addDraftComplete)}`,
+                );
+
+                return;
+            }        
+
+            /*
+             * --------------------------------------------------
+             * CANCEL CURRENT AI CONVERSATION
+             * --------------------------------------------------
+             */
+
+            if (
+                conversation.awaitingConfirmation &&
+                (
+                    normalizedText === 'cancel' ||
+                    normalizedText === 'cancel invoice' ||
+                    normalizedText === 'no'
+                )
+            ) {
+                clearConversation(
+    remoteJid,
+    senderJid,
+)
+
+                await sock.sendMessage(
+                    remoteJid,
+                    {
+                        text:
+    conversation.draft?.document_type ===
+        'hotel_invoice_add'
+        ? 'Hotel line addition cancelled.'
+        : 'Hotel invoice cancelled.',
+                    },
+                );
+
+                console.log(
+                    `[WHATSAPP AI] Cancelled hotel invoice conversation for ${remoteJid} / ${senderJid}`,
+                );
+
+                return;
+            }
+
+            /*
+             * --------------------------------------------------
+             * FINAL CONFIRMATION
+             * --------------------------------------------------
+             *
+             * "OK" is only meaningful when this conversation is
+             * explicitly waiting for confirmation.
+             */
+
+                        /*
+             * --------------------------------------------------
+             * FINAL CONFIRMATION — ADD HOTEL LINE
+             * --------------------------------------------------
+             */
+
+            if (
+                conversation.awaitingConfirmation &&
+                (
+                    normalizedText === 'ok' ||
+                    normalizedText === 'yes' ||
+                    normalizedText === 'y'
+                ) &&
+                conversation.draft?.document_type ===
+                    'hotel_invoice_add'
+            ) {
+                const draft =
+                    conversation.draft;
+
+                if (
+                    !draft ||
+                    draft.document_type !==
+                        'hotel_invoice_add'
+                ) {
+                    clearConversation(
+                        remoteJid,
+                        senderJid,
+                    );
+
+                    await sock.sendMessage(
+                        remoteJid,
+                        {
+                            text:
+                                'The hotel line draft is no longer available. Please start again.',
+                        },
+                    );
+
+                    return;
+                }
+
+                const command = {
+                    invoiceReference:
+                        draft.invoice_reference,
+
+                    passengerName:
+                        draft.passenger_name,
+
+                    hotelName:
+                        draft.hotel_name,
+
+                    roomType:
+                        draft.room_type,
+
+                    meal:
+                        draft.meal,
+
+                    checkIn:
+                        draft.check_in,
+
+                    checkOut:
+                        draft.check_out,
+
+                    nights:
+                        Number(
+                            draft.nights,
+                        ),
+
+                    roomQuantity:
+                        Number(
+                            draft.room_quantity ||
+                                1,
+                        ),
+
+                    rate:
+                        Number(
+                            draft.rate,
+                        ),
+
+                    vendorSuffix:
+                        draft.vendor_suffix,
+
+                    vendorRate:
+                        Number(
+                            draft.vendor_rate,
+                        ),
+
+                    currencyCode:
+                        draft.currency_code ||
+                        null,
+
+                    currencyRate:
+                        draft.currency_rate ===
+                            null ||
+                        draft.currency_rate ===
+                            undefined
+                            ? null
+                            : Number(
+                                  draft.currency_rate,
+                              ),
+                };
+
+                console.log(
+                    `[WHATSAPP AI] Confirmed hotel line for ${remoteJid} / ${senderJid}: ${JSON.stringify(
+                        command,
+                    )}`,
+                );
+
+                try {
+                    /*
+                     * IMPORTANT:
+                     *
+                     * Reuse the EXISTING proven ADD HOTEL LINE ERP
+                     * function. No new ERP creation logic here.
+                     */
+                    await sendAddHotelInvoiceLine({
+                        remoteJid,
+
+                        command,
+                    });
+
+                    clearConversation(
+                        remoteJid,
+                        senderJid,
+                    );
+
+                    console.log(
+                        `[WHATSAPP AI] Hotel line added and conversation cleared for ${remoteJid} / ${senderJid}`,
+                    );
+                } catch (
+                    error
+                ) {
+                    console.error(
+                        `[WHATSAPP AI] Hotel line addition failed for ${remoteJid} / ${senderJid}:`,
+                        error.message,
+                    );
+
+                    if (
+                        sock &&
+                        connectionState ===
+                            'connected'
+                    ) {
+                        try {
+                            await sock.sendMessage(
+                                remoteJid,
+                                {
+                                    text:
+                                        `Unable to add Hotel line to Invoice ${command.invoiceReference}. ${error.message}`,
+                                },
+                            );
+                        } catch (
+                            sendError
+                        ) {
+                            console.error(
+                                '[WHATSAPP AI] Failed to send hotel line error:',
+                                sendError.message,
+                            );
+                        }
+                    }
+                }
+
+                return;
+            }
+
+            if (
+    conversation.awaitingConfirmation &&
+    (
+        normalizedText === 'ok' ||
+        normalizedText === 'yes' ||
+        normalizedText === 'y'
+    )
+) {
+                const draft =
+                    conversation.draft;
+
+                if (
+                    !draft ||
+                    draft.document_type !==
+                        'hotel_invoice'
+                ) {
+                    clearConversation(
+    remoteJid,
+    senderJid,
+)
+
+                    await sock.sendMessage(
+                        remoteJid,
+                        {
+                            text:
+                                'The hotel invoice draft is no longer available. Please start again.',
+                        },
+                    );
+
+                    return;
+                }
+
+                const command = {
+                    clientSuffix:
+                        draft.client_suffix,
+
+                    passengerName:
+                        draft.passenger_name,
+
+                    hotelName:
+                        draft.hotel_name,
+
+                    roomType:
+                        draft.room_type,
+
+                    meal:
+                        draft.meal,
+
+                    checkIn:
+                        draft.check_in,
+
+                    checkOut:
+                        draft.check_out,
+
+                    nights:
+                        Number(
+                            draft.nights,
+                        ),
+
+                    roomQuantity:
+                        Number(
+                            draft.room_quantity ||
+                            1,
+                        ),
+
+                    rate:
+                        Number(
+                            draft.rate,
+                        ),
+
+                    vendorSuffix:
+                        draft.vendor_suffix,
+
+                    vendorRate:
+                        Number(
+                            draft.vendor_rate,
+                        ),
+
+                    currencyCode:
+                        draft.currency_code ||
+                        null,
+
+                    currencyRate:
+                        draft.currency_rate ===
+                        null ||
+                        draft.currency_rate ===
+                            undefined
+                            ? null
+                            : Number(
+                                  draft.currency_rate,
+                              ),
+                };
+
+                console.log(
+                    `[WHATSAPP AI] Confirmed hotel invoice for ${remoteJid} / ${senderJid}: ${JSON.stringify({
+                        clientSuffix:
+                            command.clientSuffix,
+                        vendorSuffix:
+                            command.vendorSuffix,
+                        passengerName:
+                            command.passengerName,
+                        hotelName:
+                            command.hotelName,
+                        checkIn:
+                            command.checkIn,
+                        checkOut:
+                            command.checkOut,
+                        nights:
+                            command.nights,
+                        roomQuantity:
+                            command.roomQuantity,
+                        rate:
+                            command.rate,
+                        vendorRate:
+                            command.vendorRate,
+                        currencyCode:
+                            command.currencyCode,
+                        currencyRate:
+                            command.currencyRate,
+                    })}`,
+                );
+
+                try {
+                    /*
+                     * This calls the EXISTING ERP hotel invoice
+                     * creation path already used by the bot.
+                     *
+                     * This is the first point where ERP creation
+                     * is allowed.
+                     */
+                    await sendNewHotelInvoice({
+                        remoteJid,
+                        command,
+                    });
+
+                    clearConversation(
+    remoteJid,
+    senderJid,
+)
+
+                    console.log(
+                        `[WHATSAPP AI] Hotel invoice created and conversation cleared for ${remoteJid} / ${senderJid}`,
+                    );
+                } catch (
+                    error
+                ) {
+                    console.error(
+                        `[WHATSAPP AI] Hotel invoice creation failed for ${remoteJid} / ${senderJid}:`,
+                        error.message,
+                    );
+
+                    if (
+                        sock &&
+                        connectionState ===
+                            'connected'
+                    ) {
+                        try {
+                            await sock.sendMessage(
+                                remoteJid,
+                                {
+                                    text:
+                                        `Unable to create Hotel invoice. ${error.message}`,
+                                },
+                            );
+                        } catch (
+                            sendError
+                        ) {
+                            console.error(
+                                '[WHATSAPP AI] Failed to send hotel invoice creation error:',
+                                sendError.message,
+                            );
+                        }
+                    }
+                }
+
+                return;
+            }
+
+            /*
+             * --------------------------------------------------
+             * SHOULD AI HANDLE THIS MESSAGE?
+             * --------------------------------------------------
+             *
+             * Continue an existing hotel conversation regardless
+             * of the wording.
+             *
+             * Otherwise only start AI intake when the message
+             * looks like a hotel invoice request.
+             */
+
+            const existingHotelConversation =
+                conversation.draft &&
+                conversation.draft.document_type ===
+                    'hotel_invoice' &&
+                (
+                    conversation.state ===
+                        'collecting' ||
+                    conversation.awaitingField
+                );
+
+            const hotelStartPattern =
+    /\b(?:sell|buy|hotel|room|rooms|meal|check[\s-]*in|check[\s-]*out|stay|roe|sar|vendor|passenger)\b/i;
+
+            if (
+    !existingHotelConversation &&
+    !hotelStartPattern.test(
+        text,
+    )
+) {
+    return;
+}
+
+            /*
+             * --------------------------------------------------
+             * PROCESS AI HOTEL MESSAGE
+             * --------------------------------------------------
+             */
+
+            const result =
+                await processHotelInvoiceMessage(
+                    text,
+                    conversation.draft,
+                    {
+                        currentDate:
+                            new Date(),
+                    },
+                );
+
+            conversation.lastUserMessage =
+                text;
+
+            conversation.draft =
+                result.draft ||
+                conversation.draft ||
+                null;
+
+            conversation.awaitingField =
+                result.nextQuestion?.field ||
+                null;
+
+            conversation.awaitingConfirmation =
+                Boolean(
+                    result.ok &&
+                    result.draft,
+                );
+
+            conversation.state =
+                conversation.awaitingConfirmation
+                    ? 'awaiting_confirmation'
+                    : 'collecting';
+
+            saveConversation(
+                conversation,
+            );
+
+            /*
+             * --------------------------------------------------
+             * STILL COLLECTING
+             * --------------------------------------------------
+             */
+
+            if (
+                !result.ok
+            ) {
+                await sock.sendMessage(
+                    remoteJid,
+                    {
+                        text:
+                            result.message ||
+                            'Please provide the hotel invoice information.',
+                    },
+                );
+
+                console.log(
+                    `[WHATSAPP AI] Hotel intake reply to ${remoteJid} / ${senderJid}: ${result.message || 'No message'}`,
+                );
+
+                return;
+            }
+
+            /*
+             * --------------------------------------------------
+             * COMPLETE → SHOW SUMMARY → WAIT FOR OK
+             * --------------------------------------------------
+             */
+
+            const draft =
+                result.draft;
+
+            const nights =
+                Number(
+                    draft.nights ||
+                    0,
+                );
+
+            const roomQuantity =
+                Number(
+                    draft.room_quantity ||
+                    1,
+                );
+
+            const sellingRate =
+                Number(
+                    draft.rate ||
+                    0,
+                );
+
+            const vendorRate =
+                Number(
+                    draft.vendor_rate ||
+                    0,
+                );
+
+            const currencyRate =
+                Number(
+                    draft.currency_rate ||
+                    1,
+                );
+
+            const sellingTotal =
+                sellingRate *
+                nights *
+                roomQuantity *
+                (
+                    draft.currency_code
+                        ? currencyRate
+                        : 1
+                );
+
+            const vendorTotal =
+                vendorRate *
+                nights *
+                roomQuantity *
+                (
+                    draft.currency_code
+                        ? currencyRate
+                        : 1
+                );
+
+            const profit =
+                sellingTotal -
+                vendorTotal;
+
+            const formatAmount =
+                (value) =>
+                    Number(
+                        value || 0,
+                    ).toLocaleString(
+                        'en-US',
+                        {
+                            minimumFractionDigits:
+                                2,
+                            maximumFractionDigits:
+                                2,
+                        },
+                    );
+
+            const summaryLines = [
+                '📋 HOTEL INVOICE REVIEW',
+                '',
+                `Client: ${draft.client_account_name || draft.client_suffix}`,
+                `Selling Rate: ${formatAmount(sellingRate)}${draft.currency_code ? ` ${draft.currency_code}` : ''}`,
+                '',
+                `Vendor: ${draft.vendor_account_name || draft.vendor_suffix}`,
+                `Purchase Rate: ${formatAmount(vendorRate)}${draft.currency_code ? ` ${draft.currency_code}` : ''}`,
+                '',
+                `Passenger: ${draft.passenger_name}`,
+                `Hotel: ${draft.hotel_name}`,
+                `Room: ${draft.room_type}`,
+                `Meal: ${draft.meal}`,
+                `Check-in: ${draft.check_in}`,
+                `Check-out: ${draft.check_out}`,
+                `Nights: ${nights}`,
+                `Rooms: ${roomQuantity}`,
+            ];
+
+            if (
+                draft.currency_code
+            ) {
+                summaryLines.push(
+                    `Currency: ${draft.currency_code}`,
+                    `ROE: ${formatAmount(currencyRate)}`,
+                );
+            } else {
+                summaryLines.push(
+                    'Currency: Base',
+                );
+            }
+
+            summaryLines.push(
+                '',
+                `Selling Total: ${formatAmount(sellingTotal)}`,
+                `Purchase Total: ${formatAmount(vendorTotal)}`,
+                `Profit: ${formatAmount(profit)}`,
+                '',
+                'Reply OK or YES to create this invoice.',
+                'Reply CANCEL to discard it.',
+            );
+
+            await sock.sendMessage(
+                remoteJid,
+                {
+                    text:
+                        summaryLines.join(
+                            '\n',
+                        ),
+                },
+            );
+
+            console.log(
+                `[WHATSAPP AI] Hotel invoice complete; waiting for OK from ${remoteJid} / ${senderJid}`,
+            );
+
+            return;
+        } catch (
+            error
+        ) {
+            console.error(
+                `[WHATSAPP AI] Hotel intake failed for ${remoteJid} / ${senderJid}:`,
+                error.stack ||
+                    error.message,
+            );
+
+            if (
+                sock &&
+                connectionState ===
+                    'connected'
+            ) {
+                try {
+                    await sock.sendMessage(
+                        remoteJid,
+                        {
+                            text:
+                                `Unable to process the hotel invoice request. ${error.message}`,
+                        },
+                    );
+                } catch (
+                    sendError
+                ) {
+                    console.error(
+                        '[WHATSAPP AI] Failed to send AI error reply:',
+                        sendError.message,
+                    );
+                }
+            }
+
+            return;
+        }
+    }
 
     /*
      * ------------------------------------------------------
@@ -8503,6 +9966,7 @@ if (
     ) {
         return;
     }
+
 
     try {
         await sendLedgerPdf({

@@ -1446,13 +1446,51 @@ if (!$account) {
     ]);
 
     /** @var LedgerController $ledgerController */
-    $ledgerController = app(
-        LedgerController::class
+    /*
+ * BASE / DETAILED WhatsApp ledger:
+ * Use the optimized LedgerReportService-backed export path.
+ * Foreign-currency and combined-invoice requests keep the existing path.
+ */
+$useFastLedgerPath =
+    empty($validated['currency_code'])
+    && !filter_var(
+        $validated['combine_invoices'] ?? false,
+        FILTER_VALIDATE_BOOLEAN
     );
 
-    return $ledgerController->pdf(
-        $request
+if ($useFastLedgerPath) {
+    logger()->info(
+        '[WHATSAPP] Ledger PDF using fast LedgerReportService path',
+        [
+            'account_id' => (int) $account->id,
+            'account_suffix' => $accountSuffix,
+            'date_from' => $validated['date_from'],
+            'date_to' => $validated['date_to'],
+        ]
     );
+
+    $ledgerExportController = app(
+        \App\Http\Controllers\LedgerExportController::class
+    );
+
+    return app()->call(
+        [
+            $ledgerExportController,
+            'pdf',
+        ],
+        [
+            'request' => $request,
+        ]
+    );
+}
+
+$ledgerController = app(
+    LedgerController::class
+);
+
+return $ledgerController->pdf(
+    $request
+);
 }
 
 private function whatsappAccountTypeMap(): array
