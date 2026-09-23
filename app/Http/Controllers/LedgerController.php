@@ -680,6 +680,18 @@ if ($financialYearStart === null) {
                     '=',
                     'l.voucher_id'
                 )
+                ->leftJoin(
+                    'journal_entries as je',
+                    'je.id',
+                    '=',
+                    'l.journal_entry_id'
+                )
+                ->leftJoin(
+                    'invoices as i',
+                    'i.id',
+                    '=',
+                    'l.invoice_id'
+                )
                 ->where(
                     'l.account_id',
                     $accountId
@@ -761,11 +773,15 @@ if ($financialYearStart === null) {
                     'l.con_ticket_no',
                     'l.invoice_id',
                     'l.voucher_id',
+                    'l.journal_entry_id',
                     'l.legacy_master_id',
                     'l.legacy_data',
                     'v.voucher_no',
                     'v.ref_no as voucher_ref_no',
                     'v.voucher_type as master_voucher_type',
+                    'v.legacy_data as voucher_legacy_data',
+                    'i.legacy_invoice_id as invoice_number',
+                    'je.legacy_data as journal_legacy_data',
                 ])
                 ->orderByRaw(
                     '
@@ -919,6 +935,187 @@ if ($financialYearStart === null) {
                 }
             }
         }
+
+        /*
+         * ------------------------------------------------------
+         * Additional legacy detail extractor
+         * ------------------------------------------------------
+         *
+         * Some historical JV rows have no useful value in the
+         * normalized particulars fields. Their legacy metadata may
+         * still contain narration/remarks/details/reference fields.
+         *
+         * This is display-only; no amounts or balances are changed.
+         */
+        $extractLegacyDetails =
+            static function ($value): array {
+                if (
+                    is_string(
+                        $value
+                    )
+                ) {
+                    $decoded =
+                        json_decode(
+                            $value,
+                            true
+                        );
+
+                    if (
+                        json_last_error() === JSON_ERROR_NONE
+                        &&
+                        is_array(
+                            $decoded
+                        )
+                    ) {
+                        $value =
+                            $decoded;
+                    } else {
+                        return [];
+                    }
+                }
+
+                if (
+                    !is_array(
+                        $value
+                    )
+                ) {
+                    return [];
+                }
+
+                $wantedKeys = [
+                    'particulars',
+                    'description',
+                    'narration',
+                    'remarks',
+                    'remark',
+                    'details',
+                    'detail',
+                    'memo',
+                    'note',
+                    'notes',
+                    'reference',
+                    'ref_no',
+                    'form_no',
+                    'cheque_no',
+                    'payee',
+                    'payee_name',
+                    'reason',
+                    'purpose',
+                ];
+
+                $labels = [
+                    'particulars' => 'Particulars',
+                    'description' => 'Description',
+                    'narration' => 'Narration',
+                    'remarks' => 'Remarks',
+                    'remark' => 'Remarks',
+                    'details' => 'Details',
+                    'detail' => 'Details',
+                    'memo' => 'Memo',
+                    'note' => 'Note',
+                    'notes' => 'Notes',
+                    'reference' => 'Reference',
+                    'ref_no' => 'Ref',
+                    'form_no' => 'Form',
+                    'cheque_no' => 'Cheque',
+                    'payee' => 'Payee',
+                    'payee_name' => 'Payee',
+                    'reason' => 'Reason',
+                    'purpose' => 'Purpose',
+                ];
+
+                $details = [];
+
+                $collect =
+                    static function (
+                        array $data,
+                        int $depth = 0
+                    ) use (
+                        &$collect,
+                        $wantedKeys,
+                        $labels,
+                        &$details
+                    ): void {
+                        if (
+                            $depth > 2
+                        ) {
+                            return;
+                        }
+
+                        foreach (
+                            $data as $key => $rawValue
+                        ) {
+                            $normalizedKey =
+                                strtolower(
+                                    trim(
+                                        (string) $key
+                                    )
+                                );
+
+                            if (
+                                in_array(
+                                    $normalizedKey,
+                                    $wantedKeys,
+                                    true
+                                )
+                            ) {
+                                if (
+                                    is_scalar(
+                                        $rawValue
+                                    )
+                                ) {
+                                    $text =
+                                        trim(
+                                            (string) $rawValue
+                                        );
+
+                                    if (
+                                        $text !== ''
+                                    ) {
+                                        $label =
+                                            $labels[
+                                                $normalizedKey
+                                            ]
+                                            ??
+                                            ucfirst(
+                                                str_replace(
+                                                    '_',
+                                                    ' ',
+                                                    $normalizedKey
+                                                )
+                                            );
+
+                                        $details[] =
+                                            $label .
+                                            ': ' .
+                                            $text;
+                                    }
+                                }
+                            }
+
+                            if (
+                                is_array(
+                                    $rawValue
+                                )
+                            ) {
+                                $collect(
+                                    $rawValue,
+                                    $depth + 1
+                                );
+                            }
+                        }
+                    };
+
+                $collect(
+                    $value
+                );
+
+                return array_values(
+                    array_unique(
+                        $details
+                    )
+                );
+            };
 
         /*
          * ------------------------------------------------------
@@ -1096,18 +1293,44 @@ $credit = (float) (
                 ||
                 $isRefund
             ) {
-                $voucherDisplayId =
-                    $line->legacy_reference_id !== null
-                        ? (string) (
-                            $line->legacy_reference_id
+                /*
+                 * Invoice V. ID must show the actual invoice number,
+                 * not the internal invoice-table/link ID.
+                 *
+                 * invoices.legacy_invoice_id is the normalized invoice
+                 * number used throughout the existing invoice screens.
+                 * Legacy journal fields remain safe fallbacks.
+                 */
+                $invoiceNumberCandidates = [
+                    $line->invoice_number ?? null,
+                    $line->legacy_invoice_no ?? null,
+                    $line->legacy_invoice_no_2 ?? null,
+                    $line->voucher_no ?? null,
+                    $line->legacy_reference_id ?? null,
+                    $line->invoice_id ?? null,
+                ];
+
+                $voucherDisplayId = '';
+
+                foreach (
+                    $invoiceNumberCandidates as $candidate
+                ) {
+                    $candidate = trim(
+                        (string) (
+                            $candidate
+                            ?? ''
                         )
-                        : (
-                            $line->invoice_id !== null
-                                ? (string) (
-                                    $line->invoice_id
-                                )
-                                : ''
-                        );
+                    );
+
+                    if (
+                        $candidate !== ''
+                    ) {
+                        $voucherDisplayId =
+                            $candidate;
+
+                        break;
+                    }
+                }
             } else {
                 $voucherDisplayId =
                     $line->voucher_no !== null
@@ -1365,12 +1588,15 @@ $credit = (float) (
                         );
                 }
             } else {
+                /*
+                 * JV / CR / DR / other:
+                 * first use the normalized journal-line fields.
+                 */
                 foreach (
                     [
                         $line->particulars,
                         $line->sector_description,
                         $line->mode_description,
-                        $line->mode,
                         $line->fare_taxes_service,
                     ] as $candidate
                 ) {
@@ -1384,11 +1610,114 @@ $credit = (float) (
 
                     if (
                         $candidate !== ''
+                        &&
+                        strtoupper(
+                            $candidate
+                        ) !== strtoupper(
+                            $type
+                        )
                     ) {
                         $description =
                             $candidate;
 
                         break;
+                    }
+                }
+
+                /*
+                 * Historical legacy_transactions can contain the actual
+                 * particulars even when the normalized JV line is blank.
+                 */
+                if (
+                    $description === ''
+                ) {
+                    $key =
+                        (string) (
+                            $line->voucher_id
+                            ?? ''
+                        )
+                        .
+                        '|'
+                        .
+                        trim(
+                            (string) (
+                                $line->account_code
+                                ?? ''
+                            )
+                        );
+
+                    if (
+                        isset(
+                            $legacyDescriptions[
+                                $key
+                            ]
+                        )
+                    ) {
+                        $description =
+                            implode(
+                                ' / ',
+                                $legacyDescriptions[
+                                    $key
+                                ]
+                            );
+                    }
+                }
+
+                /*
+                 * Last meaningful source: legacy JSON attached to the
+                 * journal line, journal header, or voucher.
+                 */
+                if (
+                    $description === ''
+                ) {
+                    $legacyDetails = array_merge(
+                        $extractLegacyDetails(
+                            $line->legacy_data ?? null
+                        ),
+                        $extractLegacyDetails(
+                            $line->journal_legacy_data ?? null
+                        ),
+                        $extractLegacyDetails(
+                            $line->voucher_legacy_data ?? null
+                        )
+                    );
+
+                    if (
+                        ! empty(
+                            $legacyDetails
+                        )
+                    ) {
+                        $description =
+                            implode(
+                                ' / ',
+                                array_values(
+                                    array_unique(
+                                        $legacyDetails
+                                    )
+                                )
+                            );
+                    }
+                }
+
+                if (
+                    $description === ''
+                    &&
+                    $line->voucher_ref_no !== null
+                ) {
+                    $voucherReference =
+                        trim(
+                            (string) (
+                                $line->voucher_ref_no
+                                ?? ''
+                            )
+                        );
+
+                    if (
+                        $voucherReference !== ''
+                    ) {
+                        $description =
+                            'Reference: ' .
+                            $voucherReference;
                     }
                 }
 
@@ -1399,6 +1728,58 @@ $credit = (float) (
                 ) {
                     $description =
                         $reference;
+                }
+
+                /*
+                 * If the line still contains no narrative, show useful
+                 * cheque/payee metadata instead of a blank JV row.
+                 */
+                if (
+                    $description === ''
+                ) {
+                    $fallbackDetails = [];
+
+                    foreach (
+                        [
+                            'Cheque' =>
+                                $line->cheque_no ?? null,
+                            'Passenger' =>
+                                $line->passenger ?? null,
+                            'Ticket' =>
+                                $line->ticket_no ?? null,
+                            'Con Ticket' =>
+                                $line->con_ticket_no ?? null,
+                        ] as $label => $candidate
+                    ) {
+                        $candidate =
+                            trim(
+                                (string) (
+                                    $candidate
+                                    ?? ''
+                                )
+                            );
+
+                        if (
+                            $candidate !== ''
+                        ) {
+                            $fallbackDetails[] =
+                                $label .
+                                ': ' .
+                                $candidate;
+                        }
+                    }
+
+                    if (
+                        ! empty(
+                            $fallbackDetails
+                        )
+                    ) {
+                        $description =
+                            implode(
+                                ' / ',
+                                $fallbackDetails
+                            );
+                    }
                 }
             }
 

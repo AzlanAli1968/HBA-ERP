@@ -1,8 +1,9 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, type RouteFormDefinition, applyUrlDefaults } from './../../../../../wayfinder'
+import add26698a from './add'
 /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::add
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1712
- * @route '/whatsapp-bot/documents/invoice/{reference}/hotel/add'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1758
+ * @route '/api/whatsapp-bot/documents/invoice/{reference}/hotel/add'
  */
 export const add = (args: { reference: string | number } | [reference: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
     url: add.url(args, options),
@@ -11,13 +12,13 @@ export const add = (args: { reference: string | number } | [reference: string | 
 
 add.definition = {
     methods: ["post"],
-    url: '/whatsapp-bot/documents/invoice/{reference}/hotel/add',
+    url: '/api/whatsapp-bot/documents/invoice/{reference}/hotel/add',
 } satisfies RouteDefinition<["post"]>
 
 /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::add
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1712
- * @route '/whatsapp-bot/documents/invoice/{reference}/hotel/add'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1758
+ * @route '/api/whatsapp-bot/documents/invoice/{reference}/hotel/add'
  */
 add.url = (args: { reference: string | number } | [reference: string | number ] | string | number, options?: RouteQueryOptions) => {
     if (typeof args === 'string' || typeof args === 'number') {
@@ -44,8 +45,8 @@ add.url = (args: { reference: string | number } | [reference: string | number ] 
 
 /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::add
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1712
- * @route '/whatsapp-bot/documents/invoice/{reference}/hotel/add'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1758
+ * @route '/api/whatsapp-bot/documents/invoice/{reference}/hotel/add'
  */
 add.post = (args: { reference: string | number } | [reference: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
     url: add.url(args, options),
@@ -54,8 +55,8 @@ add.post = (args: { reference: string | number } | [reference: string | number ]
 
     /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::add
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1712
- * @route '/whatsapp-bot/documents/invoice/{reference}/hotel/add'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1758
+ * @route '/api/whatsapp-bot/documents/invoice/{reference}/hotel/add'
  */
     const addForm = (args: { reference: string | number } | [reference: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
         action: add.url(args, options),
@@ -64,8 +65,8 @@ add.post = (args: { reference: string | number } | [reference: string | number ]
 
             /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::add
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1712
- * @route '/whatsapp-bot/documents/invoice/{reference}/hotel/add'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1758
+ * @route '/api/whatsapp-bot/documents/invoice/{reference}/hotel/add'
  */
         addForm.post = (args: { reference: string | number } | [reference: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
             action: add.url(args, options),
@@ -74,7 +75,7 @@ add.post = (args: { reference: string | number } | [reference: string | number ]
     
     add.form = addForm
 const hotel = {
-    add: Object.assign(add, add),
+    add: Object.assign(add, add26698a),
 }
 
 export default hotel

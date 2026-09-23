@@ -1,8 +1,10 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, type RouteFormDefinition, applyUrlDefaults } from './../../../../../wayfinder'
+import create4f58d6 from './create'
+import add26698a from './add'
 /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::create
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1779
- * @route '/whatsapp-bot/documents/invoice/visa/create'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1825
+ * @route '/api/whatsapp-bot/documents/invoice/visa/create'
  */
 export const create = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
     url: create.url(options),
@@ -11,13 +13,13 @@ export const create = (options?: RouteQueryOptions): RouteDefinition<'post'> => 
 
 create.definition = {
     methods: ["post"],
-    url: '/whatsapp-bot/documents/invoice/visa/create',
+    url: '/api/whatsapp-bot/documents/invoice/visa/create',
 } satisfies RouteDefinition<["post"]>
 
 /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::create
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1779
- * @route '/whatsapp-bot/documents/invoice/visa/create'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1825
+ * @route '/api/whatsapp-bot/documents/invoice/visa/create'
  */
 create.url = (options?: RouteQueryOptions) => {
     return create.definition.url + queryParams(options)
@@ -25,8 +27,8 @@ create.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::create
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1779
- * @route '/whatsapp-bot/documents/invoice/visa/create'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1825
+ * @route '/api/whatsapp-bot/documents/invoice/visa/create'
  */
 create.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
     url: create.url(options),
@@ -35,8 +37,8 @@ create.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
     /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::create
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1779
- * @route '/whatsapp-bot/documents/invoice/visa/create'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1825
+ * @route '/api/whatsapp-bot/documents/invoice/visa/create'
  */
     const createForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
         action: create.url(options),
@@ -45,8 +47,8 @@ create.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
             /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::create
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1779
- * @route '/whatsapp-bot/documents/invoice/visa/create'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1825
+ * @route '/api/whatsapp-bot/documents/invoice/visa/create'
  */
         createForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
             action: create.url(options),
@@ -56,8 +58,8 @@ create.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
     create.form = createForm
 /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::add
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1828
- * @route '/whatsapp-bot/documents/invoice/{reference}/visa/add'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1874
+ * @route '/api/whatsapp-bot/documents/invoice/{reference}/visa/add'
  */
 export const add = (args: { reference: string | number } | [reference: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
     url: add.url(args, options),
@@ -66,13 +68,13 @@ export const add = (args: { reference: string | number } | [reference: string | 
 
 add.definition = {
     methods: ["post"],
-    url: '/whatsapp-bot/documents/invoice/{reference}/visa/add',
+    url: '/api/whatsapp-bot/documents/invoice/{reference}/visa/add',
 } satisfies RouteDefinition<["post"]>
 
 /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::add
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1828
- * @route '/whatsapp-bot/documents/invoice/{reference}/visa/add'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1874
+ * @route '/api/whatsapp-bot/documents/invoice/{reference}/visa/add'
  */
 add.url = (args: { reference: string | number } | [reference: string | number ] | string | number, options?: RouteQueryOptions) => {
     if (typeof args === 'string' || typeof args === 'number') {
@@ -99,8 +101,8 @@ add.url = (args: { reference: string | number } | [reference: string | number ] 
 
 /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::add
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1828
- * @route '/whatsapp-bot/documents/invoice/{reference}/visa/add'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1874
+ * @route '/api/whatsapp-bot/documents/invoice/{reference}/visa/add'
  */
 add.post = (args: { reference: string | number } | [reference: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
     url: add.url(args, options),
@@ -109,8 +111,8 @@ add.post = (args: { reference: string | number } | [reference: string | number ]
 
     /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::add
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1828
- * @route '/whatsapp-bot/documents/invoice/{reference}/visa/add'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1874
+ * @route '/api/whatsapp-bot/documents/invoice/{reference}/visa/add'
  */
     const addForm = (args: { reference: string | number } | [reference: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
         action: add.url(args, options),
@@ -119,8 +121,8 @@ add.post = (args: { reference: string | number } | [reference: string | number ]
 
             /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::add
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1828
- * @route '/whatsapp-bot/documents/invoice/{reference}/visa/add'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1874
+ * @route '/api/whatsapp-bot/documents/invoice/{reference}/visa/add'
  */
         addForm.post = (args: { reference: string | number } | [reference: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
             action: add.url(args, options),
@@ -129,8 +131,8 @@ add.post = (args: { reference: string | number } | [reference: string | number ]
     
     add.form = addForm
 const visa = {
-    create: Object.assign(create, create),
-add: Object.assign(add, add),
+    create: Object.assign(create, create4f58d6),
+add: Object.assign(add, add26698a),
 }
 
 export default visa

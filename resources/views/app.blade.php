@@ -30,9 +30,19 @@
             }
         </style>
 
-        <link rel="icon" href="/favicon.ico" sizes="any">
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+        @php
+            $companyLogoUrl = app(\App\Services\CompanySettingsService::class)
+                ->formData()['logo_url'] ?? null;
+        @endphp
+
+        @if($companyLogoUrl)
+            <link rel="icon" href="{{ $companyLogoUrl }}">
+            <link rel="apple-touch-icon" href="{{ $companyLogoUrl }}">
+        @else
+            <link rel="icon" href="/favicon.ico" sizes="any">
+            <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+            <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+        @endif
 
         @fonts
 

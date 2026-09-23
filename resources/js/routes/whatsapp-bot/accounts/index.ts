@@ -1,8 +1,9 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, type RouteFormDefinition, applyUrlDefaults } from './../../../wayfinder'
+import typeFc84ed from './type'
 /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::type
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1558
- * @route '/whatsapp-bot/accounts/type/{alias}'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1604
+ * @route '/api/whatsapp-bot/accounts/type/{alias}'
  */
 export const type = (args: { alias: string | number } | [alias: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
     url: type.url(args, options),
@@ -11,13 +12,13 @@ export const type = (args: { alias: string | number } | [alias: string | number 
 
 type.definition = {
     methods: ["get","head"],
-    url: '/whatsapp-bot/accounts/type/{alias}',
+    url: '/api/whatsapp-bot/accounts/type/{alias}',
 } satisfies RouteDefinition<["get","head"]>
 
 /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::type
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1558
- * @route '/whatsapp-bot/accounts/type/{alias}'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1604
+ * @route '/api/whatsapp-bot/accounts/type/{alias}'
  */
 type.url = (args: { alias: string | number } | [alias: string | number ] | string | number, options?: RouteQueryOptions) => {
     if (typeof args === 'string' || typeof args === 'number') {
@@ -44,8 +45,8 @@ type.url = (args: { alias: string | number } | [alias: string | number ] | strin
 
 /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::type
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1558
- * @route '/whatsapp-bot/accounts/type/{alias}'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1604
+ * @route '/api/whatsapp-bot/accounts/type/{alias}'
  */
 type.get = (args: { alias: string | number } | [alias: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
     url: type.url(args, options),
@@ -53,8 +54,8 @@ type.get = (args: { alias: string | number } | [alias: string | number ] | strin
 })
 /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::type
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1558
- * @route '/whatsapp-bot/accounts/type/{alias}'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1604
+ * @route '/api/whatsapp-bot/accounts/type/{alias}'
  */
 type.head = (args: { alias: string | number } | [alias: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'head'> => ({
     url: type.url(args, options),
@@ -63,8 +64,8 @@ type.head = (args: { alias: string | number } | [alias: string | number ] | stri
 
     /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::type
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1558
- * @route '/whatsapp-bot/accounts/type/{alias}'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1604
+ * @route '/api/whatsapp-bot/accounts/type/{alias}'
  */
     const typeForm = (args: { alias: string | number } | [alias: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
         action: type.url(args, options),
@@ -73,8 +74,8 @@ type.head = (args: { alias: string | number } | [alias: string | number ] | stri
 
             /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::type
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1558
- * @route '/whatsapp-bot/accounts/type/{alias}'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1604
+ * @route '/api/whatsapp-bot/accounts/type/{alias}'
  */
         typeForm.get = (args: { alias: string | number } | [alias: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
             action: type.url(args, options),
@@ -82,8 +83,8 @@ type.head = (args: { alias: string | number } | [alias: string | number ] | stri
         })
             /**
 * @see \App\Http\Controllers\WhatsAppBotDocumentController::type
- * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1558
- * @route '/whatsapp-bot/accounts/type/{alias}'
+ * @see app/Http/Controllers/WhatsAppBotDocumentController.php:1604
+ * @route '/api/whatsapp-bot/accounts/type/{alias}'
  */
         typeForm.head = (args: { alias: string | number } | [alias: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
             action: type.url(args, {
@@ -97,7 +98,7 @@ type.head = (args: { alias: string | number } | [alias: string | number ] | stri
     
     type.form = typeForm
 const accounts = {
-    type: Object.assign(type, type),
+    type: Object.assign(type, typeFc84ed),
 }
 
 export default accounts

@@ -1441,10 +1441,6 @@ export default function LedgerIndex({
                                                 </th>
 
                                                 <th className="px-4 py-3 text-left font-semibold">
-                                                    Ref
-                                                </th>
-
-                                                <th className="px-4 py-3 text-left font-semibold">
                                                     Description
                                                 </th>
 
@@ -1474,10 +1470,6 @@ export default function LedgerIndex({
 
                                                 <td className="px-4 py-3 font-semibold">
                                                     B/F
-                                                </td>
-
-                                                <td className="px-4 py-3">
-                                                    —
                                                 </td>
 
                                                 <td className="px-4 py-3">
@@ -1525,7 +1517,7 @@ export default function LedgerIndex({
                                                 <tr>
                                                     <td
                                                         colSpan={
-                                                            8
+                                                            7
                                                         }
                                                         className="px-4 py-16 text-center text-sm text-muted-foreground"
                                                     >
@@ -1566,7 +1558,7 @@ export default function LedgerIndex({
                                                                                 className="inline-flex items-center rounded-md border px-1.5 py-0.5 font-mono text-[11px] font-semibold text-primary hover:bg-muted print:text-black"
                                                                                 title="Open invoice"
                                                                             >
-                                                                                INV #{row.ref ?? row.invoice_id}
+                                                                                INV #{row.voucher_id}
                                                                             </Link>
                                                                         )}
 
@@ -1595,23 +1587,8 @@ export default function LedgerIndex({
                                                                             )}
                                                                     </div>
 
-                                                                    {row.ref
-                                                                        && row.invoice_id !== null
-                                                                        && row.type.toUpperCase() !== 'INV' && (
-                                                                            <span className="text-[10px] text-muted-foreground">
-                                                                                Ref {row.ref}
-                                                                            </span>
-                                                                        )}
                                                                 </div>
 
-                                                            </td>
-
-                                                            <td className="px-4 py-3 font-mono text-xs">
-                                                                {
-                                                                    row.ref
-                                                                    ||
-                                                                    '—'
-                                                                }
                                                             </td>
 
                                                             <td className="max-w-[560px] px-4 py-3">
@@ -1678,7 +1655,7 @@ export default function LedgerIndex({
 
                                                 <td
                                                     colSpan={
-                                                        5
+                                                        4
                                                     }
                                                     className="px-4 py-4 text-right"
                                                 >
@@ -1761,7 +1738,7 @@ export default function LedgerIndex({
                             href={`/invoices/${row.invoice_id}`}
                             className="inline-flex items-center rounded-md border px-2 py-1 font-mono text-[10px] font-semibold text-primary"
                         >
-                            Invoice #{row.ref ?? row.invoice_id}
+                            Invoice #{row.voucher_id}
                         </Link>
                     )}
 
@@ -1780,11 +1757,6 @@ export default function LedgerIndex({
                         )}
                 </div>
 
-                {row.ref && (
-                    <div className="mt-1 text-[10px] text-muted-foreground">
-                        Ref: {row.ref}
-                    </div>
-                )}
             </div>
         ))
     )}

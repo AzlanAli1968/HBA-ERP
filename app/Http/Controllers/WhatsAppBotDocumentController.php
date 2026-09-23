@@ -1447,13 +1447,13 @@ if (!$account) {
 
     /** @var LedgerController $ledgerController */
     /*
- * BASE / DETAILED WhatsApp ledger:
- * Use the optimized LedgerReportService-backed export path.
- * Foreign-currency and combined-invoice requests keep the existing path.
+ * BASE and single-currency WhatsApp ledgers all use the optimized
+ * LedgerExportController path.  Only combined-invoice requests keep
+ * the legacy LedgerController path because they need its special merge
+ * behavior.
  */
 $useFastLedgerPath =
-    empty($validated['currency_code'])
-    && !filter_var(
+    !filter_var(
         $validated['combine_invoices'] ?? false,
         FILTER_VALIDATE_BOOLEAN
     );
@@ -1466,6 +1466,14 @@ if ($useFastLedgerPath) {
             'account_suffix' => $accountSuffix,
             'date_from' => $validated['date_from'],
             'date_to' => $validated['date_to'],
+            'currency_code' =>
+                !empty($validated['currency_code'])
+                    ? strtoupper(
+                        trim(
+                            (string) $validated['currency_code']
+                        )
+                    )
+                    : null,
         ]
     );
 

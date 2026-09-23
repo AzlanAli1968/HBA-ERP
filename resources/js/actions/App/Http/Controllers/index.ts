@@ -17,6 +17,8 @@ import AccountBalanceReportsController from './AccountBalanceReportsController'
 import AccountBalancesController from './AccountBalancesController'
 import Settings from './Settings'
 import WhatsAppBotDocumentController from './WhatsAppBotDocumentController'
+import QuotationController from './QuotationController'
+import QuotationTemplateController from './QuotationTemplateController'
 const Controllers = {
     DashboardController: Object.assign(DashboardController, DashboardController),
 AccountController: Object.assign(AccountController, AccountController),
@@ -37,6 +39,8 @@ AccountBalanceReportsController: Object.assign(AccountBalanceReportsController, 
 AccountBalancesController: Object.assign(AccountBalancesController, AccountBalancesController),
 Settings: Object.assign(Settings, Settings),
 WhatsAppBotDocumentController: Object.assign(WhatsAppBotDocumentController, WhatsAppBotDocumentController),
+QuotationController: Object.assign(QuotationController, QuotationController),
+QuotationTemplateController: Object.assign(QuotationTemplateController, QuotationTemplateController),
 }
 
 export default Controllers

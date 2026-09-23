@@ -769,7 +769,17 @@ function BankEditor({
     );
 }
 
-const WHATSAPP_BOT_URL = () => '/api/whatsapp-bot';
+const WHATSAPP_BOT_URL = () => {
+    if (
+        typeof window !== 'undefined' &&
+        (window.location.hostname === '127.0.0.1' ||
+            window.location.hostname === 'localhost')
+    ) {
+        return 'http://127.0.0.1:3210';
+    }
+
+    return '/api/whatsapp-bot';
+};
 
 function WhatsAppBotPanel() {
     const [status, setStatus] = useState<WhatsAppStatus | null>(null);
@@ -1011,7 +1021,7 @@ function WhatsAppBotPanel() {
         const interval = window.setInterval(() => {
             if (cancelled) return;
             void loadStatus();
-        }, 2500);
+        }, 60000);
 
         return () => {
             cancelled = true;

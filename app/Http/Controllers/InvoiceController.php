@@ -2377,7 +2377,8 @@ class InvoiceController extends Controller
         });
 
         return to_route('invoices.edit', ['invoice' => $invoiceId])
-            ->with('success', 'Invoice created successfully.');
+            ->with('success', 'Invoice created successfully.')
+            ->with('invoice_created', true);
     }
 
 
@@ -7645,6 +7646,7 @@ private function resolveOrCreateWhatsAppHotel(
             $mode = trim((string) ($line['mode'] ?? 'Other'));
             $agentAmount = round((float) ($line['agent_amount'] ?? 0), 4);
 
+
             if ($mode === 'Ticket') {
                 // Ticket legacy behavior:
                 // customer receivable is the gross charge, agent commission
@@ -10972,7 +10974,7 @@ $this->assertInvoicePayableAccountType(
                 ? (float) ($row->rate ?? 0) / (float) $row->currency_rate
                 : 0,
             'internal_ref_no' => (string) ($row->internal_ref_no ?? ''),
-            'confirm_no' => '',
+            'confirm_no' => (string) ($row->particulars_2 ?? ''),
             'sector_to' => (string) ($row->sector_to ?? ''),
             'flight_information' => (string) ($row->flight_information ?? ''),
             'package' => (string) ($row->particulars_2 ?? ''),
@@ -11126,9 +11128,14 @@ $this->assertInvoicePayableAccountType(
 
         $code = (string) $account->code;
 
-        if ($type === 'client' && !str_starts_with($code, '12')) {
+        if (
+            $type === 'client'
+            && !str_starts_with($code, '12')
+            && !str_starts_with($code, '21')
+        ) {
             throw ValidationException::withMessages([
-                'client_account_id' => 'Select a receivable/customer account (12xxxxx).',
+                'client_account_id' =>
+                    'Select a receivable/customer or payable/vendor account (12xxxxx or 21xxxxx).',
             ]);
         }
 

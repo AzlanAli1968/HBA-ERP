@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, type RouteFormDefinition } from './../../../../wayfinder'
 /**
 * @see \App\Http\Controllers\InvoiceController::store
- * @see app/Http/Controllers/InvoiceController.php:819
+ * @see app/Http/Controllers/InvoiceController.php:894
  * @route '/invoices/options/transfer-locations'
  */
 export const store = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -16,7 +16,7 @@ store.definition = {
 
 /**
 * @see \App\Http\Controllers\InvoiceController::store
- * @see app/Http/Controllers/InvoiceController.php:819
+ * @see app/Http/Controllers/InvoiceController.php:894
  * @route '/invoices/options/transfer-locations'
  */
 store.url = (options?: RouteQueryOptions) => {
@@ -25,7 +25,7 @@ store.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\InvoiceController::store
- * @see app/Http/Controllers/InvoiceController.php:819
+ * @see app/Http/Controllers/InvoiceController.php:894
  * @route '/invoices/options/transfer-locations'
  */
 store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -35,7 +35,7 @@ store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
     /**
 * @see \App\Http\Controllers\InvoiceController::store
- * @see app/Http/Controllers/InvoiceController.php:819
+ * @see app/Http/Controllers/InvoiceController.php:894
  * @route '/invoices/options/transfer-locations'
  */
     const storeForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -45,7 +45,7 @@ store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
             /**
 * @see \App\Http\Controllers\InvoiceController::store
- * @see app/Http/Controllers/InvoiceController.php:819
+ * @see app/Http/Controllers/InvoiceController.php:894
  * @route '/invoices/options/transfer-locations'
  */
         storeForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({

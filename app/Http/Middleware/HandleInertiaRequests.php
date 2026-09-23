@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
+use App\Services\CompanySettingsService;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -38,10 +39,18 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'company' => [
+                'logo_url' => app(CompanySettingsService::class)
+                    ->formData()['logo_url'] ?? null,
+            ],
             'auth' => [
                 'user' => $request->user(),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'flash' => [
+                'success' => session('success'),
+                'invoice_created' => session('invoice_created', false),
+            ],
         ];
     }
 }

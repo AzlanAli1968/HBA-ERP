@@ -28,13 +28,10 @@ class LedgerExportController extends Controller
             );
 
         $report =
-            $ledgerService->report(
-                (int) $data['account_id'],
-                $data['date_from'],
-                $data['date_to']
+            $this->buildExportReport(
+                $ledgerService,
+                $data
             );
-
-        $report = $this->enrichReportForExport($report);
 
         $company =
             $companyService->reportData();
@@ -68,13 +65,10 @@ class LedgerExportController extends Controller
             );
 
         $report =
-            $ledgerService->report(
-                (int) $data['account_id'],
-                $data['date_from'],
-                $data['date_to']
+            $this->buildExportReport(
+                $ledgerService,
+                $data
             );
-
-        $report = $this->enrichReportForExport($report);
 
         $company =
             $companyService->reportData();
@@ -126,14 +120,12 @@ class LedgerExportController extends Controller
             );
 
         $report =
-            $ledgerService->report(
-                (int) $data['account_id'],
-                $data['date_from'],
-                $data['date_to']
+            $this->buildExportReport(
+                $ledgerService,
+                $data
             );
 
-        
-        $report = $this->enrichReportForExport($report);$company =
+        $company =
             $companyService->reportData();
 
         $spreadsheet =
@@ -514,7 +506,7 @@ class LedgerExportController extends Controller
                 ?? '';
 
             if (
-                $item['currency_note']
+                ! empty($item['currency_note'])
             ) {
                 $description .=
                     "\n" .
@@ -694,6 +686,695 @@ class LedgerExportController extends Controller
 
 
     /**
+     * Build one fast export report for Base or a selected foreign currency.
+     */
+    private function buildExportReport(
+        LedgerReportService $ledgerService,
+        array $data
+    ): array {
+        $report = $ledgerService->report(
+            (int) $data['account_id'],
+            $data['date_from'],
+            $data['date_to']
+        );
+
+        $report = $this->enrichReportForExport(
+            $report
+        );
+
+        $currencyCode = strtoupper(
+            trim(
+                (string) ($data['currency_code'] ?? '')
+            )
+        );
+
+        if ($currencyCode === '') {
+            return $report;
+        }
+
+        return $this->applyFastForeignCurrencyReport(
+            $report,
+            $currencyCode
+        );
+    }
+
+    /**
+     * Convert the fast base report to a foreign-currency report without
+     * entering LedgerController's legacy-heavy Currency path.
+     */
+    private function applyFastForeignCurrencyReport(
+        array $report,
+        string $selectedCurrency
+    ): array {
+        $selectedCurrency = strtoupper(
+            trim($selectedCurrency)
+        );
+
+        $accountId = (int) data_get(
+            $report,
+            'account.id',
+            0
+        );
+
+        $dateFrom = trim(
+            (string) data_get($report, 'date_from', '')
+        );
+
+        $financialYearStart =
+            $this->legacyFinancialYearStartForExport(
+                $dateFrom
+            );
+
+        $foreignOpening = 0.0;
+
+        if (
+            $accountId > 0
+            && Schema::hasTable('account_opening_balances')
+        ) {
+            $openingRow = DB::table(
+                'account_opening_balances'
+            )
+                ->where('account_id', $accountId)
+                ->whereRaw(
+                    'UPPER(TRIM(COALESCE(currency_code, ?))) = ?',
+                    ['', $selectedCurrency]
+                )
+                ->selectRaw(
+                    'COALESCE(SUM(CASE WHEN opening_currency IS NOT NULL THEN opening_currency WHEN COALESCE(exchange_rate, 0) > 0 THEN (opening_debit - opening_credit) / exchange_rate ELSE 0 END), 0) AS foreign_opening'
+                )
+                ->first();
+
+            $foreignOpening = (float) (
+                $openingRow->foreign_opening
+                ?? 0
+            );
+        }
+
+        $prePeriodDebit = 0.0;
+        $prePeriodCredit = 0.0;
+
+        if ($accountId > 0 && Schema::hasTable('journal_entry_lines')) {
+            $movementQuery = DB::table(
+                'journal_entry_lines as l'
+            )
+                ->leftJoin(
+                    'vouchers as v',
+                    'v.id',
+                    '=',
+                    'l.voucher_id'
+                )
+                ->where(
+                    'l.account_id',
+                    $accountId
+                )
+                ->whereRaw(
+                    'UPPER(TRIM(COALESCE(l.currency_code, ?))) = ?',
+                    ['', $selectedCurrency]
+                )
+                ->whereRaw(
+                    'DATE(COALESCE(l.posting_date, l.voucher_date, v.voucher_date)) < ?',
+                    [$dateFrom]
+                );
+
+            if ($financialYearStart !== null) {
+                $movementQuery->whereRaw(
+                    'DATE(COALESCE(l.posting_date, l.voucher_date, v.voucher_date)) >= ?',
+                    [$financialYearStart]
+                );
+            }
+
+            $movement = $movementQuery
+                ->selectRaw(
+                    'COALESCE(SUM(CASE WHEN ABS(COALESCE(l.foreign_debit, 0)) > 0.00005 THEN ABS(l.foreign_debit) WHEN ABS(COALESCE(l.debit, 0)) > 0.00005 AND COALESCE(l.currency_rate, 0) > 0 THEN ABS(l.debit) / l.currency_rate ELSE 0 END), 0) AS debit_amount'
+                )
+                ->selectRaw(
+                    'COALESCE(SUM(CASE WHEN ABS(COALESCE(l.foreign_credit, 0)) > 0.00005 THEN ABS(l.foreign_credit) WHEN ABS(COALESCE(l.credit, 0)) > 0.00005 AND COALESCE(l.currency_rate, 0) > 0 THEN ABS(l.credit) / l.currency_rate ELSE 0 END), 0) AS credit_amount'
+                )
+                ->first();
+
+            $prePeriodDebit = (float) (
+                $movement->debit_amount
+                ?? 0
+            );
+
+            $prePeriodCredit = (float) (
+                $movement->credit_amount
+                ?? 0
+            );
+        }
+
+        $openingBalance =
+            $foreignOpening
+            + $prePeriodDebit
+            - $prePeriodCredit;
+
+        $runningBalance = $openingBalance;
+        $periodDebit = 0.0;
+        $periodCredit = 0.0;
+        $foreignRows = [];
+
+        foreach (($report['rows'] ?? []) as $rawRow) {
+            $row = is_object($rawRow)
+                ? (array) $rawRow
+                : (is_array($rawRow) ? $rawRow : []);
+
+            if ($row === []) {
+                continue;
+            }
+
+            $rowCurrency = strtoupper(
+                trim(
+                    (string) ($row['currency_code'] ?? '')
+                )
+            );
+
+            if ($rowCurrency !== $selectedCurrency) {
+                continue;
+            }
+
+            $debit = abs(
+                (float) ($row['foreign_debit'] ?? 0)
+            );
+            $credit = abs(
+                (float) ($row['foreign_credit'] ?? 0)
+            );
+
+            if (
+                $debit <= 0.00005
+                && $credit <= 0.00005
+            ) {
+                $baseDebit = abs(
+                    (float) ($row['debit'] ?? 0)
+                );
+                $baseCredit = abs(
+                    (float) ($row['credit'] ?? 0)
+                );
+                $roe = (float) (
+                    $row['currency_rate']
+                    ?? 0
+                );
+
+                if ($roe > 0) {
+                    $debit = $baseDebit / $roe;
+                    $credit = $baseCredit / $roe;
+                }
+            }
+
+            if (
+                $debit <= 0.00005
+                && $credit <= 0.00005
+            ) {
+                continue;
+            }
+
+            $row['debit'] = round($debit, 4);
+            $row['credit'] = round($credit, 4);
+
+            $periodDebit += $debit;
+            $periodCredit += $credit;
+            $runningBalance += $debit - $credit;
+            $row['balance'] = round(
+                $runningBalance,
+                4
+            );
+            $row['side'] =
+                $runningBalance < 0
+                    ? 'Cr'
+                    : 'Dr';
+
+            if (! empty($row['currency_breakdown'])) {
+                $description = trim(
+                    (string) ($row['description'] ?? '')
+                );
+                $breakdown = trim(
+                    (string) $row['currency_breakdown']
+                );
+
+                if (
+                    $breakdown !== ''
+                    && ! str_contains(
+                        $description,
+                        $breakdown
+                    )
+                ) {
+                    $row['description'] = $description !== ''
+                        ? $description . "\n" . $breakdown
+                        : $breakdown;
+                }
+
+                $row['currency_note'] = $breakdown;
+            }
+
+            $foreignRows[] = $row;
+        }
+
+        $closingBalance = $runningBalance;
+
+        $report['selectedCurrency'] = $selectedCurrency;
+        $report['selectedCurrencyName'] =
+            $this->currencyNameForExport(
+                $selectedCurrency
+            );
+        $report['isForeignCurrencyLedger'] = true;
+        $report['financialYearStart'] = $financialYearStart;
+
+        $report['opening'] = array_replace(
+            is_array($report['opening'] ?? null)
+                ? $report['opening']
+                : [],
+            [
+                'balance' => round(
+                    $openingBalance,
+                    4
+                ),
+                'side' =>
+                    $openingBalance < 0
+                        ? 'Cr'
+                        : 'Dr',
+            ]
+        );
+
+        $report['period'] = array_replace(
+            is_array($report['period'] ?? null)
+                ? $report['period']
+                : [],
+            [
+                'debit' => round(
+                    $periodDebit,
+                    4
+                ),
+                'credit' => round(
+                    $periodCredit,
+                    4
+                ),
+            ]
+        );
+
+        $report['closing'] = array_replace(
+            is_array($report['closing'] ?? null)
+                ? $report['closing']
+                : [],
+            [
+                'balance' => round(
+                    $closingBalance,
+                    4
+                ),
+                'side' =>
+                    $closingBalance < 0
+                        ? 'Cr'
+                        : 'Dr',
+            ]
+        );
+
+        $report['rows'] = $foreignRows;
+
+        /* Compatibility aliases used by older ledger Blade variants. */
+        $report['openingBalance'] = round(
+            $openingBalance,
+            4
+        );
+        $report['periodDebit'] = round(
+            $periodDebit,
+            4
+        );
+        $report['periodCredit'] = round(
+            $periodCredit,
+            4
+        );
+        $report['closingBalance'] = round(
+            $closingBalance,
+            4
+        );
+
+        return $report;
+    }
+
+    private function legacyFinancialYearStartForExport(
+        string $dateFrom
+    ): ?string {
+        $dateFrom = trim($dateFrom);
+
+        if ($dateFrom === '') {
+            return null;
+        }
+
+        try {
+            $legacySchema =
+                DB::connection('legacy')
+                    ->getSchemaBuilder();
+
+            if (! $legacySchema->hasTable('tblfinancialyears')) {
+                return null;
+            }
+
+            $financialYear =
+                DB::connection('legacy')
+                    ->table('tblfinancialyears')
+                    ->where(
+                        'StartingDate',
+                        '<=',
+                        $dateFrom . ' 23:59:59'
+                    )
+                    ->where(
+                        'EndingDate',
+                        '>=',
+                        $dateFrom . ' 00:00:00'
+                    )
+                    ->orderByDesc('StartingDate')
+                    ->first();
+
+            if ($financialYear) {
+                return substr(
+                    (string) $financialYear->StartingDate,
+                    0,
+                    10
+                );
+            }
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        return null;
+    }
+
+    private function currencyNameForExport(
+        string $selectedCurrency
+    ): string {
+        $selectedCurrency = strtoupper(
+            trim($selectedCurrency)
+        );
+
+        if (
+            $selectedCurrency === ''
+            || ! Schema::hasTable('currencies')
+        ) {
+            return $selectedCurrency;
+        }
+
+        try {
+            $columns = Schema::getColumnListing(
+                'currencies'
+            );
+
+            $codeColumn = null;
+
+            foreach (
+                ['code', 'currency_code', 'currency', 'Currency']
+                as $candidate
+            ) {
+                if (in_array($candidate, $columns, true)) {
+                    $codeColumn = $candidate;
+                    break;
+                }
+            }
+
+            if ($codeColumn === null) {
+                return $selectedCurrency;
+            }
+
+            $nameColumn = null;
+
+            foreach (
+                ['name', 'currency_name', 'full_name', 'FullName']
+                as $candidate
+            ) {
+                if (in_array($candidate, $columns, true)) {
+                    $nameColumn = $candidate;
+                    break;
+                }
+            }
+
+            if ($nameColumn !== null) {
+                $currency = DB::table('currencies')
+                    ->where($codeColumn, $selectedCurrency)
+                    ->first([
+                        $codeColumn,
+                        $nameColumn,
+                    ]);
+
+                return trim(
+                    (string) (
+                        $currency->{$nameColumn}
+                        ?? $selectedCurrency
+                    )
+                ) ?: $selectedCurrency;
+            }
+        } catch (\Throwable $e) {
+            return $selectedCurrency;
+        }
+
+        return $selectedCurrency;
+    }
+
+    /**
+     * Calculate a human-readable foreign-currency formula from the normalized
+     * journal row. This intentionally avoids legacy InvTickets queries.
+     */
+    private function currencyCalculationForExportRow(
+        array $row,
+        $line,
+        array $legacyData
+    ): array {
+        $currency = strtoupper(
+            trim(
+                (string) (
+                    $line->currency_code
+                    ?? ($legacyData['Cur'] ?? '')
+                    ?? ''
+                )
+            )
+        );
+
+        $roe = (float) (
+            $line->currency_rate
+            ?? ($legacyData['CurRate'] ?? 0)
+            ?? 0
+        );
+
+        $currencyQty = (float) (
+            $line->currency_quantity
+            ?? ($legacyData['CurQty'] ?? 0)
+            ?? 0
+        );
+
+        $foreignDebit = abs(
+            (float) ($line->foreign_debit ?? 0)
+        );
+        $foreignCredit = abs(
+            (float) ($line->foreign_credit ?? 0)
+        );
+
+        if ($foreignDebit <= 0.00005) {
+            $foreignDebit = abs(
+                (float) ($legacyData['CurDr'] ?? 0)
+            );
+        }
+
+        if ($foreignCredit <= 0.00005) {
+            $foreignCredit = abs(
+                (float) ($legacyData['CurCr'] ?? 0)
+            );
+        }
+
+        $foreignAmount = max(
+            $foreignDebit,
+            $foreignCredit
+        );
+
+        if (
+            $foreignAmount <= 0.00005
+            && $roe > 0
+        ) {
+            $baseAmount = max(
+                abs((float) ($row['debit'] ?? 0)),
+                abs((float) ($row['credit'] ?? 0))
+            );
+
+            if ($baseAmount > 0.00005) {
+                $foreignAmount =
+                    $baseAmount / $roe;
+            }
+        }
+
+        if (
+            $currency === ''
+            || $roe <= 0
+            || $foreignAmount <= 0.00005
+        ) {
+            return [
+                'currency_code' => $currency,
+                'currency_quantity' => $currencyQty,
+                'currency_rate' => $roe,
+                'foreign_debit' => $foreignDebit,
+                'foreign_credit' => $foreignCredit,
+                'currency_breakdown' => null,
+                'currency_note' => null,
+            ];
+        }
+
+        $rawMode = strtoupper(
+            trim(
+                (string) (
+                    $legacyData['Mode']
+                    ?? ($row['mode_description_export'] ?? '')
+                    ?? ($row['mode'] ?? '')
+                    ?? ''
+                )
+            )
+        );
+
+        $quantity = $currencyQty;
+
+        if (str_contains($rawMode, 'HOTEL')) {
+            $quantity = $this->hotelNightsForExport(
+                $legacyData
+            );
+        } else {
+            if ($quantity <= 0) {
+                $quantity = (float) (
+                    $legacyData['Quantity']
+                    ?? 0
+                );
+            }
+        }
+
+        if ($quantity <= 0) {
+            $quantity = 1.0;
+        }
+
+        $unitRate =
+            $foreignAmount / $quantity;
+
+        if ($unitRate <= 0.00005) {
+            return [
+                'currency_code' => $currency,
+                'currency_quantity' => $currencyQty,
+                'currency_rate' => $roe,
+                'foreign_debit' => $foreignDebit,
+                'foreign_credit' => $foreignCredit,
+                'currency_breakdown' => null,
+                'currency_note' => null,
+            ];
+        }
+
+        $breakdown = sprintf(
+            '%s %s × %s × %s',
+            $currency,
+            $this->formatCurrencyFactorForExport($unitRate),
+            $this->formatCurrencyFactorForExport($quantity),
+            number_format($roe, 2, '.', '')
+        );
+
+        return [
+            'currency_code' => $currency,
+            'currency_quantity' => $currencyQty,
+            'currency_rate' => $roe,
+            'foreign_debit' => $foreignDebit,
+            'foreign_credit' => $foreignCredit,
+            'currency_breakdown' => $breakdown,
+            'currency_note' => $breakdown,
+        ];
+    }
+
+    private function hotelNightsForExport(
+        array $legacyData
+    ): float {
+        $direct = (float) (
+            $legacyData['InvNights']
+            ?? $legacyData['nights']
+            ?? 0
+        );
+
+        if ($direct > 0) {
+            return $direct;
+        }
+
+        $from = trim(
+            (string) (
+                $legacyData['ServiceDateFrom']
+                ?? $legacyData['service_date_from']
+                ?? ''
+            )
+        );
+        $to = trim(
+            (string) (
+                $legacyData['ServiceDateTo']
+                ?? $legacyData['service_date_to']
+                ?? ''
+            )
+        );
+
+        if ($from !== '' && $to !== '') {
+            try {
+                $fromDate = \Carbon\Carbon::parse($from)->startOfDay();
+                $toDate = \Carbon\Carbon::parse($to)->startOfDay();
+                $days = $fromDate->diffInDays($toDate);
+
+                if ($days > 0) {
+                    return (float) $days;
+                }
+            } catch (\Throwable $e) {
+                // Continue to sector-text fallback.
+            }
+        }
+
+        $sector = trim(
+            (string) (
+                $legacyData['Sector/Description']
+                ?? $legacyData['sector_description']
+                ?? ''
+            )
+        );
+
+        if ($sector !== '') {
+            $patterns = [
+                '/(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}).*?(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/i',
+                '/(\d{4}[\/-]\d{1,2}[\/-]\d{1,2}).*?(\d{4}[\/-]\d{1,2}[\/-]\d{1,2})/i',
+            ];
+
+            foreach ($patterns as $pattern) {
+                if (! preg_match($pattern, $sector, $matches)) {
+                    continue;
+                }
+
+                try {
+                    $fromDate = \Carbon\Carbon::parse($matches[1])->startOfDay();
+                    $toDate = \Carbon\Carbon::parse($matches[2])->startOfDay();
+                    $days = $fromDate->diffInDays($toDate);
+
+                    if ($days > 0) {
+                        return (float) $days;
+                    }
+                } catch (\Throwable $e) {
+                    continue;
+                }
+            }
+        }
+
+        return 0.0;
+    }
+
+    private function formatCurrencyFactorForExport(
+        float $value
+    ): string {
+        $formatted = number_format(
+            $value,
+            4,
+            '.',
+            ''
+        );
+
+        $formatted = rtrim(
+            rtrim($formatted, '0'),
+            '.'
+        );
+
+        return $formatted !== ''
+            ? $formatted
+            : '0';
+    }
+
+    /**
      * Enrich ledger rows with the legacy invoice number and the
      * underlying invoice/service detail fields that are already stored
      * on journal_entry_lines / legacy_data.
@@ -746,6 +1427,11 @@ class LedgerExportController extends Controller
             'sector_description',
             'fare_taxes_service',
             'particulars',
+            'currency_code',
+            'currency_quantity',
+            'currency_rate',
+            'foreign_debit',
+            'foreign_credit',
         ];
 
         $availableColumns = Schema::getColumnListing('journal_entry_lines');
@@ -942,6 +1628,10 @@ class LedgerExportController extends Controller
                 (string) ($line->particulars ?? '')
             );
 
+            $type = strtoupper(
+                trim((string) ($row['type'] ?? ''))
+            );
+
             // Build a rich, human-readable export description without
             // changing the accounting description or any amounts.
             $richParts = [];
@@ -982,12 +1672,61 @@ class LedgerExportController extends Controller
                 : trim((string) ($row['description'] ?? ''));
 
             /*
+             * The optimized LedgerReportService path is intentionally kept
+             * for WhatsApp performance.  Its base description can be only the
+             * generic service mode (for example HOTEL / VISA).  When the
+             * enrichment above recovered a real service description, replace
+             * only those generic labels with the enriched text.  This does not
+             * add any queries or change accounting amounts/balances.
+             */
+            $currentDescription = trim(
+                (string) ($row['description'] ?? '')
+            );
+
+            $genericDescriptions = [
+                'HOTEL',
+                'VISA',
+                'TICKET',
+                'TRANSFER',
+                'OTHER',
+            ];
+
+            if (
+                $row['rich_description_export'] !== ''
+                && (
+                    $currentDescription === ''
+                    || in_array(
+                        strtoupper($currentDescription),
+                        $genericDescriptions,
+                        true
+                    )
+                )
+            ) {
+                $row['description'] =
+                    $row['rich_description_export'];
+            }
+
+            /*
+             * Build the foreign-currency calculation from the normalized
+             * journal line / imported Master JSON only. This is display-side
+             * enrichment: accounting amounts remain untouched. It also avoids
+             * the legacy InvTickets/HotelRateDetails lookups that caused the
+             * old WhatsApp Currency path to lag.
+             */
+            $currencyData = $this->currencyCalculationForExportRow(
+                $row,
+                $line,
+                $legacyData
+            );
+
+            foreach ($currencyData as $currencyKey => $currencyValue) {
+                $row[$currencyKey] = $currencyValue;
+            }
+
+            /*
              * Accu-style convention: invoice number belongs in Ref.
              * Only fill it when the normal report reference is empty.
              */
-            $type = strtoupper(
-                trim((string) ($row['type'] ?? ''))
-            );
 
             if (
                 ($type === 'INV' || $type === 'RFD' || $type === 'INV')
@@ -1069,6 +1808,12 @@ class LedgerExportController extends Controller
                 'required',
                 'date',
                 'after_or_equal:date_from',
+            ],
+
+            'currency_code' => [
+                'nullable',
+                'string',
+                'max:20',
             ],
         ]);
     }

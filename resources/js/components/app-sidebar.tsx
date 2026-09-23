@@ -213,30 +213,20 @@ const navigationGroups: NavigationGroup[] = [
             },
         ],
     },
-    {
+     {
         label: 'Operations',
         sections: [
             {
                 label: 'Travel Operations',
                 items: [
                     {
-                        title: 'Hotels',
-                        href: '/hotels',
-                        icon: Hotel,
-                    },
-                    {
-                        title: 'Visa',
-                        href: '/visa',
-                        icon: ShieldCheck,
-                    },
-                    {
-                        title: 'Car Rental',
-                        href: '/car-rental',
-                        icon: Car,
-                    },
-                    {
                         title: 'Quotations',
                         href: '/quotations',
+                        icon: FileText,
+                    },
+                    {
+                        title: 'Quotation Templates',
+                        href: '/quotation-templates',
                         icon: FileText,
                     },
                 ],
@@ -406,6 +396,35 @@ const navigationGroups: NavigationGroup[] = [
     },
 ];
 
+type CompanyLogoProps = {
+    company?: {
+        logo_url?: string | null;
+    };
+};
+
+function CompanyLogoMark() {
+    const { company } = usePage<CompanyLogoProps>().props;
+    const logoUrl = company?.logo_url ?? null;
+
+    if (logoUrl) {
+        return (
+            <div className="flex size-9 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm">
+                <img
+                    src={logoUrl}
+                    alt="Company logo"
+                    className="size-full object-contain p-1"
+                />
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex size-9 items-center justify-center rounded-xl bg-neutral-900 text-sm font-bold text-white shadow-sm dark:bg-white dark:text-neutral-900">
+            HBA
+        </div>
+    );
+}
+
 export function AppSidebar() {
     const page = usePage();
 
@@ -484,9 +503,7 @@ export function AppSidebar() {
                             tooltip="HBA Travel & Tours"
                         >
                             <Link href={dashboard()} prefetch>
-                                <div className="flex size-9 items-center justify-center rounded-xl bg-neutral-900 text-sm font-bold text-white shadow-sm dark:bg-white dark:text-neutral-900">
-                                    HBA
-                                </div>
+                                <CompanyLogoMark />
 
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate font-bold tracking-tight">

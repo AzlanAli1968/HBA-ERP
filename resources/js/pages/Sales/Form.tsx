@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     ArrowLeft,
     Calculator,
@@ -155,6 +155,12 @@ type Master = {
     transfer_locations: SimpleOption[];
     passengers: SimpleOption[];
     airlines: SimpleOption[];
+};
+
+type SharedProps = {
+    flash?: {
+        invoice_created?: boolean;
+    };
 };
 
 type Props = {
@@ -621,7 +627,21 @@ export default function Form({ formMode, invoice, lines: initialLines, master, m
     const [addedVehicles, setAddedVehicles] = useState<SimpleOption[]>([]);
     const [addedTransferLocations, setAddedTransferLocations] = useState<SimpleOption[]>([]);
     const [transferLocationTarget, setTransferLocationTarget] = useState<'from' | 'to'>('from');
+    const page = usePage<SharedProps>();
     const [modal, setModal] = useState<ModalKind>(null);
+    const [showCreateSuccess, setShowCreateSuccess] = useState(false);
+
+    useEffect(() => {
+        setShowCreateSuccess(
+            formMode === 'edit' &&
+            page.props.flash?.invoice_created === true,
+        );
+    }, [formMode, page.props.flash?.invoice_created]);
+
+    useEffect(() => {
+        setLines(initialLines);
+    }, [initialLines]);
+
     const [modalBusy, setModalBusy] = useState(false);
     const [modalError, setModalError] = useState('');
     const [hotelDraft, setHotelDraft] = useState({
@@ -661,6 +681,24 @@ export default function Form({ formMode, invoice, lines: initialLines, master, m
     const customerOptions = useMemo(
         () => master.customers.map(accountOption),
         [master.customers],
+    );
+
+    const clientSelectionOptions = useMemo(
+        () => [
+            ...master.customers.map((customer) => ({
+                value: String(customer.id),
+                label: `${customer.code} \u2014 ${customer.name}`,
+                subtitle: 'Client / Customer',
+                keywords: `${customer.code} ${customer.name} client customer`,
+            })),
+            ...master.vendors.map((vendor) => ({
+                value: String(vendor.id),
+                label: `${vendor.code} \u2014 ${vendor.name}`,
+                subtitle: 'Vendor',
+                keywords: `${vendor.code} ${vendor.name} vendor supplier`,
+            })),
+        ],
+        [master.customers, master.vendors],
     );
 
     const agentOptions = useMemo(
@@ -891,7 +929,52 @@ const payableOptions = useMemo(
         current.map((line, currentIndex) => {
             if (currentIndex !== index) return line;
 
-            const next = { ...line, [key]: value } as Line;
+            let next = { ...line, [key]: value } as Line;
+
+            /*
+             * Smart line duplication for invoice creation:
+             *
+             * - Changing to a mode that already exists copies the latest
+             *   previous line of that mode.
+             * - Changing to a mode that does not exist yet starts from the
+             *   original blank line and keeps only the passenger name.
+             *
+             * This stays entirely in local form state; no Save is required.
+             */
+            if (key === 'mode' && formMode === 'create') {
+                const nextMode = String(value ?? '').trim();
+
+                const previousSameMode = [...current]
+                    .slice(0, currentIndex)
+                    .reverse()
+                    .find(
+                        (candidate) =>
+                            String(candidate.mode ?? '').trim() === nextMode,
+                    );
+
+                const passengerName =
+                    String(line.passenger_name ?? '').trim() ||
+                    [...current]
+                        .reverse()
+                        .map((candidate) =>
+                            String(candidate.passenger_name ?? '').trim(),
+                        )
+                        .find(Boolean) ||
+                    '';
+
+                if (previousSameMode) {
+                    next = {
+                        ...previousSameMode,
+                        mode: nextMode,
+                    };
+                } else {
+                    next = {
+                        ...initialLines[0],
+                        mode: nextMode,
+                        passenger_name: passengerName,
+                    };
+                }
+            }
 
             /*
              * IMPORTANT:
@@ -1098,12 +1181,25 @@ const payableOptions = useMemo(
 
     function addLine(copyCurrent = false): void {
         const base = selectedLine ?? initialLines[0];
-        const line = copyCurrent && base
-            ? { ...base }
-            : { ...initialLines[0] };
+        const line =
+            formMode === 'create' && base
+                ? { ...base }
+                : copyCurrent && base
+                    ? { ...base }
+                    : { ...initialLines[0] };
 
-        if (copyCurrent && line.passenger_name) {
-            line.passenger_name = `${line.passenger_name}`;
+        if (formMode === 'create') {
+            const passengerName =
+                String(base?.passenger_name ?? '').trim() ||
+                [...lines]
+                    .reverse()
+                    .map((candidate) =>
+                        String(candidate.passenger_name ?? '').trim(),
+                    )
+                    .find(Boolean) ||
+                '';
+
+            line.passenger_name = passengerName;
         }
 
         setLines((current) => [...current, line]);
@@ -1446,6 +1542,44 @@ const payableOptions = useMemo(
     return (
         <>
             <Modal
+                open={showCreateSuccess}
+                title="Invoice Created Successfully"
+                onClose={() => setShowCreateSuccess(false)}
+            >
+                <div className="space-y-4 p-5">
+                    <div className="rounded-lg border bg-muted/20 p-4">
+                        <div className="text-sm text-muted-foreground">
+                            Your invoice has been created successfully.
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col justify-end gap-2 border-t pt-4 sm:flex-row">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowCreateSuccess(false);
+                                router.get('/invoices/create');
+                            }}
+                            className="inline-flex h-10 items-center justify-center rounded-lg border px-4 text-sm font-medium hover:bg-muted"
+                        >
+                            Create Another
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowCreateSuccess(false);
+                                router.get('/invoices');
+                            }}
+                            className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+                        >
+                            View All Invoices
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
+            <Modal
                 open={modal === 'visa'}
                 title="Add Visa Type / Package"
                 onClose={() => {
@@ -1759,7 +1893,7 @@ const payableOptions = useMemo(
                                             Number(value),
                                         )
                                     }
-                                    options={customerOptions}
+                                    options={clientSelectionOptions}
                                     placeholder="Search client..."
                                     searchPlaceholder="Search client code or name..."
                                 />
@@ -2376,7 +2510,7 @@ const payableOptions = useMemo(
                                             <SearchableSelect
                                                 value={selectedLine.payable_account_code}
                                                 onChange={(value) => updateLine(selectedIndex, 'payable_account_code', value)}
-                                                options={vendorOptions}
+                                                options={payableOptions}
                                                 placeholder="Search vendor..."
                                                 searchPlaceholder="Vendor code or name..."
                                             />
@@ -2402,7 +2536,7 @@ const payableOptions = useMemo(
                                             <SearchableSelect
                                                 value={selectedLine.payable_account_2}
                                                 onChange={(value) => updateLine(selectedIndex, 'payable_account_2', value)}
-                                                options={vendorOptions}
+                                                options={payableOptions}
                                                 placeholder="Optional vendor 2"
                                                 searchPlaceholder="Search vendor..."
                                             />
@@ -2414,7 +2548,7 @@ const payableOptions = useMemo(
                                             <SearchableSelect
                                                 value={selectedLine.payable_account_3}
                                                 onChange={(value) => updateLine(selectedIndex, 'payable_account_3', value)}
-                                                options={vendorOptions}
+                                                options={payableOptions}
                                                 placeholder="Optional vendor 3"
                                                 searchPlaceholder="Search vendor..."
                                             />
@@ -2429,7 +2563,7 @@ const payableOptions = useMemo(
                                             <SearchableSelect
                                                 value={selectedLine.payable_account_code}
                                                 onChange={(value) => updateLine(selectedIndex, 'payable_account_code', value)}
-                                                options={vendorOptions}
+                                                options={payableOptions}
                                                 placeholder="Search vendor..."
                                                 searchPlaceholder="Vendor code or name..."
                                             />
@@ -2439,13 +2573,13 @@ const payableOptions = useMemo(
                                         </Field>
                                         <Field label="Vendor Amount 2">
                                             <div className="flex gap-2">
-                                                <SearchableSelect value={selectedLine.payable_account_2} onChange={(value) => updateLine(selectedIndex, 'payable_account_2', value)} options={vendorOptions} placeholder="Vendor 2" searchPlaceholder="Search vendor..." />
+                                                <SearchableSelect value={selectedLine.payable_account_2} onChange={(value) => updateLine(selectedIndex, 'payable_account_2', value)} options={payableOptions} placeholder="Vendor 2" searchPlaceholder="Search vendor..." />
                                                 <input type="number" min="0" step="0.0001" value={selectedLine.vendor_amount_2} onChange={(e) => updateLine(selectedIndex, 'vendor_amount_2', numberValue(e.target.value))} className={`${inputClass} w-32`} />
                                             </div>
                                         </Field>
                                         <Field label="Vendor Amount 3">
                                             <div className="flex gap-2">
-                                                <SearchableSelect value={selectedLine.payable_account_3} onChange={(value) => updateLine(selectedIndex, 'payable_account_3', value)} options={vendorOptions} placeholder="Vendor 3" searchPlaceholder="Search vendor..." />
+                                                <SearchableSelect value={selectedLine.payable_account_3} onChange={(value) => updateLine(selectedIndex, 'payable_account_3', value)} options={payableOptions} placeholder="Vendor 3" searchPlaceholder="Search vendor..." />
                                                 <input type="number" min="0" step="0.0001" value={selectedLine.vendor_amount_3} onChange={(e) => updateLine(selectedIndex, 'vendor_amount_3', numberValue(e.target.value))} className={`${inputClass} w-32`} />
                                             </div>
                                         </Field>

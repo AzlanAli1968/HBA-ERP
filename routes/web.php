@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use App\Http\Controllers\AccountController;
 use Illuminate\Support\Facades\Route;
@@ -22,6 +22,8 @@ use App\Http\Controllers\CompanyBankController;
 use App\Http\Controllers\WhatsAppBotDocumentController;
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Http;
+use App\Http\Controllers\QuotationController;
+use App\Http\Controllers\QuotationTemplateController;
 
 
 Route::redirect('/', '/dashboard')->name('home');
@@ -504,9 +506,9 @@ Route::put(
 | WhatsApp Bot server-side proxy
 |--------------------------------------------------------------------------
 |
-| Browser → Laravel → Plesk Node.js WhatsApp service
+| Browser â†’ Laravel â†’ Plesk Node.js WhatsApp service
 | Node service is exposed by Plesk at:
-| https://erp.hbatravels.org/wa-service
+| http://127.0.0.1:3210
 |
 */
 
@@ -515,7 +517,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/api/whatsapp-bot/status', function () {
         return Http::timeout(10)
             ->get(
-                'https://erp.hbatravels.org/wa-service/status'
+                'http://127.0.0.1:3210/status'
             )
             ->json();
     });
@@ -523,7 +525,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/api/whatsapp-bot/groups', function () {
         return Http::timeout(10)
             ->get(
-                'https://erp.hbatravels.org/wa-service/groups'
+                'http://127.0.0.1:3210/groups'
             )
             ->json();
     });
@@ -531,7 +533,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/api/whatsapp-bot/start', function () {
         return Http::timeout(10)
             ->post(
-                'https://erp.hbatravels.org/wa-service/start',
+                'http://127.0.0.1:3210/start',
                 request()->all()
             )
             ->json();
@@ -540,7 +542,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/api/whatsapp-bot/refresh-groups', function () {
         return Http::timeout(10)
             ->post(
-                'https://erp.hbatravels.org/wa-service/refresh-groups',
+                'http://127.0.0.1:3210/refresh-groups',
                 request()->all()
             )
             ->json();
@@ -549,7 +551,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/api/whatsapp-bot/select-group', function () {
         return Http::timeout(10)
             ->post(
-                'https://erp.hbatravels.org/wa-service/select-group',
+                'http://127.0.0.1:3210/select-group',
                 request()->all()
             )
             ->json();
@@ -558,7 +560,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/api/whatsapp-bot/logout', function () {
         return Http::timeout(10)
             ->post(
-                'https://erp.hbatravels.org/wa-service/logout',
+                'http://127.0.0.1:3210/logout',
                 request()->all()
             )
             ->json();
@@ -567,7 +569,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/api/whatsapp-bot/clear-session', function () {
         return Http::timeout(10)
             ->post(
-                'https://erp.hbatravels.org/wa-service/clear-session',
+                'http://127.0.0.1:3210/clear-session',
                 request()->all()
             )
             ->json();
@@ -822,6 +824,40 @@ Route::post(
     'whatsapp-bot.documents.invoice.transfer.create.legacy'
 );
 
+Route::get('/quotations', [QuotationController::class, 'index'])
+    ->name('quotations.index');
+
+Route::get('/quotations/create', [QuotationController::class, 'create'])
+    ->name('quotations.create');
+
+Route::post('/quotations', [QuotationController::class, 'store'])
+    ->name('quotations.store');
+
+Route::get('/quotations/{quotation}', [QuotationController::class, 'show'])
+    ->name('quotations.show');
+
+Route::get('/quotations/{quotation}/pdf', [QuotationController::class, 'pdf'])
+    ->name('quotations.pdf');
+
+Route::get('/quotation-templates', [QuotationTemplateController::class, 'index'])
+    ->name('quotation-templates.index');
+
+Route::get('/quotation-templates/create', [QuotationTemplateController::class, 'create'])
+    ->name('quotation-templates.create');
+
+Route::post('/quotation-templates', [QuotationTemplateController::class, 'store'])
+    ->name('quotation-templates.store');
+
+Route::get('/quotation-templates/{quotationTemplate}/edit', [QuotationTemplateController::class, 'edit'])
+    ->name('quotation-templates.edit');
+
+Route::put('/quotation-templates/{quotationTemplate}', [QuotationTemplateController::class, 'update'])
+    ->name('quotation-templates.update');
+
+Route::delete('/quotation-templates/{quotationTemplate}', [QuotationTemplateController::class, 'destroy'])
+    ->name('quotation-templates.destroy');
+
+
 Route::post(
     '/whatsapp-bot/documents/invoice/{reference}/transfer/add',
     [
@@ -833,4 +869,6 @@ Route::post(
     ->name(
         'whatsapp-bot.documents.invoice.transfer.add.legacy'
     );
+
+
 

@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, type RouteFormDefinition, applyUrlDefaults } from './../../../wayfinder'
 /**
 * @see \App\Http\Controllers\InvoiceController::print
- * @see app/Http/Controllers/InvoiceController.php:398
+ * @see app/Http/Controllers/InvoiceController.php:452
  * @route '/invoices/{invoice}/voucher/print'
  */
 export const print = (args: { invoice: string | number } | [invoice: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -16,7 +16,7 @@ print.definition = {
 
 /**
 * @see \App\Http\Controllers\InvoiceController::print
- * @see app/Http/Controllers/InvoiceController.php:398
+ * @see app/Http/Controllers/InvoiceController.php:452
  * @route '/invoices/{invoice}/voucher/print'
  */
 print.url = (args: { invoice: string | number } | [invoice: string | number ] | string | number, options?: RouteQueryOptions) => {
@@ -44,7 +44,7 @@ print.url = (args: { invoice: string | number } | [invoice: string | number ] | 
 
 /**
 * @see \App\Http\Controllers\InvoiceController::print
- * @see app/Http/Controllers/InvoiceController.php:398
+ * @see app/Http/Controllers/InvoiceController.php:452
  * @route '/invoices/{invoice}/voucher/print'
  */
 print.get = (args: { invoice: string | number } | [invoice: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -53,7 +53,7 @@ print.get = (args: { invoice: string | number } | [invoice: string | number ] | 
 })
 /**
 * @see \App\Http\Controllers\InvoiceController::print
- * @see app/Http/Controllers/InvoiceController.php:398
+ * @see app/Http/Controllers/InvoiceController.php:452
  * @route '/invoices/{invoice}/voucher/print'
  */
 print.head = (args: { invoice: string | number } | [invoice: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -63,7 +63,7 @@ print.head = (args: { invoice: string | number } | [invoice: string | number ] |
 
     /**
 * @see \App\Http\Controllers\InvoiceController::print
- * @see app/Http/Controllers/InvoiceController.php:398
+ * @see app/Http/Controllers/InvoiceController.php:452
  * @route '/invoices/{invoice}/voucher/print'
  */
     const printForm = (args: { invoice: string | number } | [invoice: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -73,7 +73,7 @@ print.head = (args: { invoice: string | number } | [invoice: string | number ] |
 
             /**
 * @see \App\Http\Controllers\InvoiceController::print
- * @see app/Http/Controllers/InvoiceController.php:398
+ * @see app/Http/Controllers/InvoiceController.php:452
  * @route '/invoices/{invoice}/voucher/print'
  */
         printForm.get = (args: { invoice: string | number } | [invoice: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -82,7 +82,7 @@ print.head = (args: { invoice: string | number } | [invoice: string | number ] |
         })
             /**
 * @see \App\Http\Controllers\InvoiceController::print
- * @see app/Http/Controllers/InvoiceController.php:398
+ * @see app/Http/Controllers/InvoiceController.php:452
  * @route '/invoices/{invoice}/voucher/print'
  */
         printForm.head = (args: { invoice: string | number } | [invoice: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -98,7 +98,7 @@ print.head = (args: { invoice: string | number } | [invoice: string | number ] |
     print.form = printForm
 /**
 * @see \App\Http\Controllers\InvoiceController::pdf
- * @see app/Http/Controllers/InvoiceController.php:413
+ * @see app/Http/Controllers/InvoiceController.php:467
  * @route '/invoices/{invoice}/voucher/pdf'
  */
 export const pdf = (args: { invoice: string | number } | [invoice: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -113,7 +113,7 @@ pdf.definition = {
 
 /**
 * @see \App\Http\Controllers\InvoiceController::pdf
- * @see app/Http/Controllers/InvoiceController.php:413
+ * @see app/Http/Controllers/InvoiceController.php:467
  * @route '/invoices/{invoice}/voucher/pdf'
  */
 pdf.url = (args: { invoice: string | number } | [invoice: string | number ] | string | number, options?: RouteQueryOptions) => {
@@ -141,7 +141,7 @@ pdf.url = (args: { invoice: string | number } | [invoice: string | number ] | st
 
 /**
 * @see \App\Http\Controllers\InvoiceController::pdf
- * @see app/Http/Controllers/InvoiceController.php:413
+ * @see app/Http/Controllers/InvoiceController.php:467
  * @route '/invoices/{invoice}/voucher/pdf'
  */
 pdf.get = (args: { invoice: string | number } | [invoice: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -150,7 +150,7 @@ pdf.get = (args: { invoice: string | number } | [invoice: string | number ] | st
 })
 /**
 * @see \App\Http\Controllers\InvoiceController::pdf
- * @see app/Http/Controllers/InvoiceController.php:413
+ * @see app/Http/Controllers/InvoiceController.php:467
  * @route '/invoices/{invoice}/voucher/pdf'
  */
 pdf.head = (args: { invoice: string | number } | [invoice: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -160,7 +160,7 @@ pdf.head = (args: { invoice: string | number } | [invoice: string | number ] | s
 
     /**
 * @see \App\Http\Controllers\InvoiceController::pdf
- * @see app/Http/Controllers/InvoiceController.php:413
+ * @see app/Http/Controllers/InvoiceController.php:467
  * @route '/invoices/{invoice}/voucher/pdf'
  */
     const pdfForm = (args: { invoice: string | number } | [invoice: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -170,7 +170,7 @@ pdf.head = (args: { invoice: string | number } | [invoice: string | number ] | s
 
             /**
 * @see \App\Http\Controllers\InvoiceController::pdf
- * @see app/Http/Controllers/InvoiceController.php:413
+ * @see app/Http/Controllers/InvoiceController.php:467
  * @route '/invoices/{invoice}/voucher/pdf'
  */
         pdfForm.get = (args: { invoice: string | number } | [invoice: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -179,7 +179,7 @@ pdf.head = (args: { invoice: string | number } | [invoice: string | number ] | s
         })
             /**
 * @see \App\Http\Controllers\InvoiceController::pdf
- * @see app/Http/Controllers/InvoiceController.php:413
+ * @see app/Http/Controllers/InvoiceController.php:467
  * @route '/invoices/{invoice}/voucher/pdf'
  */
         pdfForm.head = (args: { invoice: string | number } | [invoice: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
